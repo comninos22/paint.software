@@ -17,15 +17,15 @@ Replace the AppImage with an updated release to update its bundled libraries.
 The `.deb` uses distribution Qt libraries; keep the operating system and image codecs updated.
 
 ```sh
-chmod +x paint.software-1.1.93-security.1-x86_64.AppImage
-./paint.software-1.1.93-security.1-x86_64.AppImage
+chmod +x paint.software-1.1.94-x86_64.AppImage
+./paint.software-1.1.94-x86_64.AppImage
 # If FUSE is unavailable:
-./paint.software-1.1.93-security.1-x86_64.AppImage --appimage-extract-and-run
+./paint.software-1.1.94-x86_64.AppImage --appimage-extract-and-run
 ```
 
 ```sh
-sha256sum -c SHA256SUMS
-sudo apt install ./paint.software_1.1.93_amd64.deb
+sha256sum --ignore-missing -c SHA256SUMS
+sudo apt install ./paint.software_1.1.94_amd64.deb
 ```
 
 There is no APT repository or Flatpak release for this fork. The Debian package uses the
@@ -46,7 +46,7 @@ sudo apt install build-essential cmake ninja-build qt6-base-dev qt6-image-format
 git clone https://github.com/comninos22/paint.software.git
 cd paint.software
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build --target all paintdotnet_tests paintdotnet_brush_tests paintdotnet_security_tests -j2
+cmake --build build --target all paintdotnet_tests paintdotnet_brush_tests paintdotnet_security_tests paintdotnet_ui_tests -j2
 ctest --test-dir build --output-on-failure
 ./build/paintdotnet
 ```
@@ -60,6 +60,12 @@ ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1 ctest --test-dir build
 ```
 
 ## File and plugin behavior
+
+- The mouse wheel scrolls vertically; Shift-wheel or a horizontal trackpad gesture scrolls horizontally.
+  Both canvas scrollbars remain visible. Use the Zoom tool or explicit zoom controls to change magnification.
+- Tools, Colors, History and Layers reopen in their saved positions, with all four visible on first launch.
+  Panels you deliberately hide stay hidden. Wayland desktops use XWayland when available to preserve the
+  separate floating windows; native-only Wayland uses separate dock areas inside the main window.
 
 - Open/import supports PNG, JPEG, BMP, GIF, TIFF, WebP, and native layered `.psw` documents.
 - Input limits: 32,768 pixels per axis, 32 megapixels (binary units) per image, 256 layers,

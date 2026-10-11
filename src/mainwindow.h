@@ -38,6 +38,7 @@ public:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
+    void showEvent(QShowEvent *event) override;
     void changeEvent(QEvent *event) override;   // follow minimize/restore
 private:
     void syncUtilityWindowsToMainState();
@@ -148,6 +149,7 @@ private:
     void showLayerPropertiesDialog();
     void showSelectionContextMenu(const QPoint &globalPos);
     void loadUiState();
+    void restoreDockState();
     void saveUiState();
     void normalizeDockLayout(QDockWidget *changedDock);
     Qt::Orientation splitOrientationForArea(Qt::DockWidgetArea area) const;
@@ -161,7 +163,8 @@ private:
     void addRecentFile(const QString &filePath);
     void updateRecentFilesMenu();
     void createMenuBarCornerIcons();
-    void resetUtilityWindow(QDockWidget *dock);
+    void resetUtilityWindow(QDockWidget *dock, bool show = true);
+    void keepUtilityWindowOnScreen(QDockWidget *dock);
     void populateFixedToolbar();
     void rebuildToolsPaletteTooltips();
     void layoutToolsPalette(bool horizontal);
@@ -243,6 +246,7 @@ private:
 
     bool m_normalizingDockLayout = false;
     bool m_restoringState = false;
+    bool m_uiStateRestored = false;
     bool m_minimized = false;
     // Top-level windows hidden with the app. Not always the QDockWidget itself:
     // Qt wraps grouped panels in a QDockWidgetGroupWindow, which owns the window.

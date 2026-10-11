@@ -8,6 +8,7 @@
 #include <QEvent>
 #include <QTabletEvent>
 #include <QSettings>
+#include <QApplication>
 #include <cmath>
 
 bool CanvasWidget::event(QEvent *event)
@@ -48,8 +49,10 @@ CanvasWidget::CanvasWidget(QWidget *parent)
 }
 
 void CanvasWidget::setDocument(Document *doc) {
+    disconnect(m_documentSizeConnection);
     m_document = doc;
     if (doc) {
+        m_documentSizeConnection = connect(doc, &Document::sizeChanged, this, &CanvasWidget::viewChanged);
         connect(doc, &Document::documentChanged, this, [this]() {
             m_cacheValid = false;
             update();
@@ -61,6 +64,7 @@ void CanvasWidget::setDocument(Document *doc) {
         connect(doc, &Document::selectionChanged, this, [this]() { update(); });
     }
     m_cacheValid = false;
+    emit viewChanged();
     update();
 }
 
@@ -73,11 +77,20 @@ void CanvasWidget::setCurrentTool(Tool *tool) {
 void CanvasWidget::setZoom(double zoom) {
     m_zoom = qBound(0.01, zoom, 64.0);
     emit zoomChanged(m_zoom);
+    emit viewChanged();
+    update();
+}
+
+void CanvasWidget::setPan(const QPointF &pan) {
+    m_pan = pan;
+    m_autoCenter = false;
+    emit viewChanged();
     update();
 }
 
 void CanvasWidget::setShowRulers(bool show) {
     m_showRulers = show;
+    emit viewChanged();
     update();
 }
 
@@ -113,6 +126,7 @@ void CanvasWidget::zoomToFit() {
         (width() - rs - m_document->width() * m_zoom) / 2.0,
         (height() - rs - m_document->height() * m_zoom) / 2.0
     );
+    emit viewChanged();
     update();
 }
 
@@ -129,6 +143,7 @@ void CanvasWidget::zoomToRect(const QRect &canvasRect) {
         (height() - rs - canvasRect.height() * m_zoom) / 2.0 - canvasRect.y() * m_zoom
     );
     m_autoCenter = false;   // framed on a specific rect, not on the whole image
+    emit viewChanged();
     update();
 }
 
@@ -141,6 +156,7 @@ void CanvasWidget::zoomToActual() {
             (height() - rs - m_document->height()) / 2.0
         );
     }
+    emit viewChanged();
     update();
 }
 
@@ -157,6 +173,7 @@ void CanvasWidget::centerView() {
     const qreal imgW = m_document->width() * m_zoom;
     const qreal imgH = m_document->height() * m_zoom;
     m_pan = QPointF((width() - rs - imgW) / 2.0, (height() - rs - imgH) / 2.0);
+    emit viewChanged();
     update();
 }
 
@@ -501,10 +518,8 @@ void CanvasWidget::mousePressEvent(QMouseEvent *event) {
 void CanvasWidget::mouseMoveEvent(QMouseEvent *event) {
     if (m_isPanning) {
         QPoint delta = event->pos() - m_lastPanPos;
-        m_pan += QPointF(delta);
-        m_autoCenter = false;   // the user placed the view; leave it alone
+        setPan(m_pan + QPointF(delta));
         m_lastPanPos = event->pos();
-        update();
         return;
     }
 
@@ -541,14 +556,16 @@ void CanvasWidget::mouseReleaseEvent(QMouseEvent *event) {
 }
 
 void CanvasWidget::wheelEvent(QWheelEvent *event) {
-    QPointF oldCanvasPos = widgetToCanvas(event->position());
-    double factor = event->angleDelta().y() > 0 ? 1.15 : 1.0 / 1.15;
-    setZoom(m_zoom * factor);
-
-    QPointF newWidgetPos = canvasToWidget(oldCanvasPos);
-    m_pan += event->position() - newWidgetPos;
-    m_autoCenter = false;   // wheel zoom anchors on the cursor; keep that anchor
-    update();
+    // Qt has already applied the system's natural-scrolling preference. Prefer
+    // pixel deltas for trackpads, and preserve fractional high-resolution wheel
+    // steps. Wheel gestures never change zoom, including with Ctrl held.
+    QPointF delta = event->pixelDelta();
+    if (delta.isNull())
+        delta = QPointF(event->angleDelta()) * (QApplication::wheelScrollLines() * 20.0 / 120.0);
+    if ((event->modifiers() & Qt::ShiftModifier) && delta.x() == 0)
+        delta = QPointF(delta.y(), 0);
+    if (!delta.isNull()) emit scrollRequested(delta);
+    event->accept();
 }
 
 void CanvasWidget::keyPressEvent(QKeyEvent *event) {
@@ -605,7 +622,8 @@ void CanvasWidget::resizeEvent(QResizeEvent *event) {
     // to be: the window manager maximises us *after* the first layout pass, so
     // centring only at construction leaves the image off-centre. Re-centring on
     // every resize until the user pans keeps it right, maximised or restored.
-    if (m_autoCenter) centerView();
+    if (m_autoCenter && m_document) centerView();
+    else emit viewChanged();
 }
 
 void CanvasWidget::tabletEvent(QTabletEvent *event) {

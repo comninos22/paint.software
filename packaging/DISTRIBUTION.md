@@ -5,7 +5,7 @@ Build from the reviewed checkout:
 
 ```sh
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
-cmake --build build --target all paintdotnet_tests paintdotnet_brush_tests paintdotnet_security_tests -j2
+cmake --build build --target all paintdotnet_tests paintdotnet_brush_tests paintdotnet_security_tests paintdotnet_ui_tests -j2
 ctest --test-dir build --output-on-failure
 cpack --config build/CPackConfig.cmake -G DEB -B dist
 (cd dist && sha256sum *.deb > SHA256SUMS)

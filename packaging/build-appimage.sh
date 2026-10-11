@@ -6,7 +6,7 @@ source_dir=$(realpath "${2:-$(dirname "$0")/..}")
 build_dir=${BUILD_DIR:-"$work/build"}
 appdir="$work/AppDir"
 qt="$work/Qt"
-version=${APPIMAGE_VERSION:-1.1.93-security.1}
+version=${APPIMAGE_VERSION:-1.1.94}
 export LANG=C.UTF-8
 export QMAKE="$qt/bin/qmake6"
 export LD_LIBRARY_PATH="$qt/lib"
@@ -18,7 +18,7 @@ test ! -e "$appdir" # never overwrite an unrelated directory
 
 cmake --fresh -S "$source_dir" -B "$build_dir" -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_PREFIX_PATH="$qt"
-cmake --build "$build_dir" --target all paintdotnet_tests paintdotnet_brush_tests paintdotnet_security_tests -j"${JOBS:-2}"
+cmake --build "$build_dir" --target all paintdotnet_tests paintdotnet_brush_tests paintdotnet_security_tests paintdotnet_ui_tests -j"${JOBS:-2}"
 ctest --test-dir "$build_dir" --output-on-failure
 DESTDIR="$appdir" cmake --install "$build_dir"
 # CMake needs the complete SDK while configuring; deployment only needs the

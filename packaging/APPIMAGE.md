@@ -1,7 +1,7 @@
 # AppImage
 
-Download `paint.software-1.1.93-security.1-x86_64.AppImage` from
-[the personal release](https://github.com/comninos22/paint.software/releases/tag/v1.1.93-security.1).
+Download `paint.software-1.1.94-x86_64.AppImage` from
+[the personal release](https://github.com/comninos22/paint.software/releases/tag/v1.1.94).
 Check it against the release's `SHA256SUMS`, then make it executable and launch it.
 Use `--appimage-extract-and-run` if FUSE is unavailable; no installation or root access is required.
 
@@ -11,11 +11,15 @@ remain system dependencies. It was built on Ubuntu 24.04 and smoke-tested there 
 and offscreen rendering, and on Fedora 44 with offscreen rendering and Wayland.
 These are startup tests, not exhaustive desktop, printing, GPU, or distribution compatibility tests.
 
-The application source is the existing immutable `v1.1.93-security.1` tag,
-commit `e07dfa988bb143282717985c23df758a2e47deb6`. The packaging recipe was added later on `main`;
-the tag and original source archive were not moved. Build metadata records both separately.
+The application and packaging recipe are in the immutable `v1.1.94` tag.
+The release's build metadata records the exact source commit and validation results.
 Native application plugins remain disabled by default. The AppImage is not a sandbox.
 Its Qt and codecs are bundled, so update the entire AppImage when a rebuilt release is available.
+
+Floating panel positions require X11/XWayland because native Wayland does not let applications place
+top-level windows. On Wayland sessions with `DISPLAY` available, the application selects XWayland by
+default. An explicit `QT_QPA_PLATFORM` or `-platform` option is respected. Native Wayland keeps the panels
+in distinct dock areas, with its own saved layout, so they remain visible and movable within the window.
 
 ## Build recipe
 
@@ -37,13 +41,12 @@ JOBS=2 bash packaging/build-appimage.sh /tmp/paint-appimage-build
 The preparation script checks every input against `appimage-inputs.json` before extracting or
 executing anything. To use cached downloads, place the exact files in the work directory's `inputs/`
 subdirectory first. Use a new work directory for each build. Packaging accepts an optional second
-argument pointing to a different source checkout, for example the original release tag with the
-current packaging notice/manifest copied into its `packaging/` directory.
+argument pointing to a different source checkout containing the matching packaging notice and manifest.
 
 The recipe builds and tests the application, installs it into an AppDir, bundles X11/Wayland
 support, omits the optional SVG-dependent Adwaita decoration and unused raster plugins,
 includes license notices and Qt SBOMs, then uses an explicitly pinned AppImage runtime.
-Nothing is uploaded or published. All three regression suites must pass before packaging.
+Nothing is uploaded or published. All four regression suites, including panel restart tests, must pass before packaging.
 The result is in the work directory's `dist/` subdirectory.
 
 Upstream deployment tools use mutable `continuous` URLs. The fixed hashes intentionally reject

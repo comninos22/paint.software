@@ -6,6 +6,8 @@
 #include <QColor>
 #include <QPainter>
 #include <QMouseEvent>
+#include <QWheelEvent>
+#include <QScrollBar>
 #include <QDir>
 #include <QFile>
 #include <cstdio>
@@ -18,6 +20,7 @@
 #include "core/selection.h"
 #include "core/history.h"
 #include "canvas/canvaswidget.h"
+#include "canvas/canvasview.h"
 #include "i18n.h"
 #include "theme.h"
 
@@ -37,6 +40,7 @@
 #include "tools/texttool.h"
 #include "tools/colorpickertool.h"
 #include "tools/lassotool.h"
+#include "tools/zoomtool.h"
 #include "panels/colorspanel.h"
 #include "panels/tooloptionspanel.h"
 #include "core/hatchpatterns.h"
@@ -2196,6 +2200,108 @@ int main(int argc, char **argv) {
         CHECK(canvas.pan() == QPointF(5, 7), "a user pan survives a resize (no auto-centring)");
         canvas.resetToDefaultView();
         CHECK(isCentred(1500, 900), "resetToDefaultView re-enables centring after a pan");
+    }
+
+    SECTION("Canvas scrolling and zoom tool");
+    {
+        Document doc(1200, 1000);
+        CanvasView view;
+        view.resize(620, 440);
+        view.show();
+        QCoreApplication::processEvents();
+        CanvasWidget *canvas = view.canvas();
+        QScrollBar *horizontal = view.horizontalScrollBar();
+        QScrollBar *vertical = view.verticalScrollBar();
+        canvas->setDocument(&doc);
+        canvas->setZoom(1.0);
+        canvas->centerView();
+        CHECK(horizontal->isVisible() && vertical->isVisible(), "both canvas scrollbars are visible");
+        CHECK(horizontal->maximum() > horizontal->minimum()
+              && vertical->maximum() > vertical->minimum(), "large image is scrollable on both axes");
+
+        auto wheel = [&](QPoint pixels, QPoint angles, Qt::KeyboardModifiers modifiers = Qt::NoModifier) {
+            QWheelEvent event(QPointF(180, 140), QPointF(180, 140), pixels, angles,
+                              Qt::NoButton, modifiers, Qt::NoScrollPhase, false);
+            QApplication::sendEvent(canvas, &event);
+            CHECK(event.isAccepted(), "canvas consumes wheel events");
+        };
+        QPointF before = canvas->pan();
+        wheel(QPoint(), QPoint(0, -120));
+        CHECK(canvas->pan().y() < before.y() && canvas->pan().x() == before.x(),
+              "ordinary wheel scrolls down vertically without horizontal drift");
+        CHECK(canvas->zoom() == 1.0, "ordinary wheel does not zoom");
+        CHECK(vertical->value() == qRound(-canvas->pan().y()), "wheel keeps vertical scrollbar in sync");
+        before = canvas->pan();
+        wheel(QPoint(0, -7), QPoint(0, -120), Qt::ControlModifier);
+        CHECK(canvas->pan() == before + QPointF(0, -7) && canvas->zoom() == 1.0,
+              "trackpad pixel deltas take priority and Ctrl-wheel does not zoom");
+        before = canvas->pan();
+        wheel(QPoint(), QPoint(0, -1));
+        wheel(QPoint(), QPoint(0, -1));
+        CHECK(std::abs(canvas->pan().y() - before.y() + QApplication::wheelScrollLines() / 3.0) < 0.001,
+              "high-resolution wheel deltas accumulate without rounding away motion");
+        before = canvas->pan();
+        wheel(QPoint(-9, 0), QPoint());
+        CHECK(canvas->pan() == before + QPointF(-9, 0), "horizontal trackpad gestures scroll horizontally");
+        before = canvas->pan();
+        wheel(QPoint(0, -11), QPoint(), Qt::ShiftModifier);
+        CHECK(canvas->pan() == before + QPointF(-11, 0), "Shift-wheel scrolls horizontally");
+        before = canvas->pan();
+        wheel(QPoint(), QPoint());
+        CHECK(canvas->pan() == before && canvas->zoom() == 1.0, "zero-delta gestures do not move or zoom");
+
+        horizontal->setValue(horizontal->minimum());
+        CHECK(std::abs(canvas->canvasToWidget(QPointF()).x() - canvas->rulerSize() - 40) < 0.51,
+              "horizontal scrollbar reaches the image's left edge");
+        vertical->setValue(vertical->maximum());
+        CHECK(std::abs(canvas->canvasToWidget(QPointF(0, doc.height())).y() - canvas->height() + 40) < 0.51,
+              "vertical scrollbar reaches the image's bottom edge");
+        before = canvas->pan();
+        wheel(QPoint(0, -1000), QPoint());
+        CHECK(canvas->pan() == before, "wheel is bounded at the end of the scrollbar");
+
+        canvas->setPan(QPointF(17.5, -92.25));
+        CHECK(horizontal->value() == qRound(-17.5) && vertical->value() == qRound(92.25)
+              && canvas->pan() == QPointF(17.5, -92.25), "pan updates bars without losing fractional positioning");
+        const QPointF anchor(180, 140);
+        const QPointF imageAnchor = canvas->widgetToCanvas(anchor);
+        ZoomTool tool;
+        canvas->setCurrentTool(&tool);
+        QMouseEvent press(QEvent::MouseButtonPress, anchor, anchor, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QMouseEvent release(QEvent::MouseButtonRelease, anchor, anchor, Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+        QApplication::sendEvent(canvas, &press);
+        QApplication::sendEvent(canvas, &release);
+        CHECK(canvas->zoom() == 1.5 && QLineF(imageAnchor, canvas->widgetToCanvas(anchor)).length() < 0.001,
+              "dedicated zoom tool still zooms in around the clicked point");
+        CHECK(horizontal->value() == qRound(-canvas->pan().x())
+              && vertical->value() == qRound(-canvas->pan().y()), "zoom tool keeps both scrollbars synchronized");
+        QMouseEvent rightRelease(QEvent::MouseButtonRelease, anchor, anchor, Qt::RightButton, Qt::NoButton, Qt::NoModifier);
+        QApplication::sendEvent(canvas, &rightRelease);
+        CHECK(std::abs(canvas->zoom() - 1.0) < 0.001, "dedicated zoom tool still zooms out");
+        canvas->setCurrentTool(nullptr);
+
+        doc.resizeCanvas(1600, 1400, 0, 0);
+        CHECK(vertical->maximum() == qRound(doc.height() * canvas->zoom() - canvas->height() + canvas->rulerSize() + 40),
+              "document resize updates scrollbar range");
+        const int oldPage = horizontal->pageStep();
+        before = canvas->pan();
+        view.resize(740, 510);
+        QCoreApplication::processEvents();
+        CHECK(horizontal->pageStep() > oldPage && canvas->pan() == before,
+              "window resize updates page size without moving a manually positioned view");
+        canvas->setShowRulers(false);
+        CHECK(horizontal->pageStep() == canvas->width(), "ruler changes update scrollbar page size");
+        Document small(32, 32);
+        canvas->setDocument(&small);
+        canvas->resetToDefaultView();
+        CHECK(horizontal->isVisible() && vertical->isVisible()
+              && horizontal->minimum() == horizontal->maximum()
+              && vertical->minimum() == vertical->maximum(), "small fitted image keeps visible bars with no scroll range");
+        before = canvas->pan();
+        wheel(QPoint(), QPoint(0, -120));
+        CHECK(canvas->pan() == before && canvas->zoom() == 1.0, "wheel on fitted image does not pan or zoom");
+        canvas->setDocument(nullptr);
+        CHECK(horizontal->maximum() == 0 && vertical->maximum() == 0, "empty canvas clears scrollbar ranges");
     }
 
     SECTION("Zoom reuses the flattened document cache");

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(PaintDali VERSION 1.1.93 LANGUAGES C CXX)
+project(PaintDali VERSION 1.1.94 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -40,6 +40,7 @@ set(CORE_SOURCES
 
 set(CANVAS_SOURCES
     src/canvas/canvaswidget.cpp
+    src/canvas/canvasview.cpp
 )
 
 set(TOOLS_SOURCES
@@ -224,7 +225,13 @@ target_link_libraries(paintdotnet_security_tests PRIVATE Qt6::Widgets Qt6::Core 
 add_test(NAME security_regression COMMAND paintdotnet_security_tests)
 add_test(NAME functional COMMAND paintdotnet_tests)
 add_test(NAME brush_regression COMMAND paintdotnet_brush_tests)
-set_tests_properties(functional brush_regression security_regression PROPERTIES
+add_executable(paintdotnet_ui_tests EXCLUDE_FROM_ALL
+    tests/test_ui.cpp src/mainwindow.cpp src/dockdropoverlay.cpp ${NONMAIN_SOURCES})
+target_include_directories(paintdotnet_ui_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(paintdotnet_ui_tests PRIVATE Qt6::Widgets Qt6::PrintSupport Qt6::Core Qt6::Gui)
+target_compile_definitions(paintdotnet_ui_tests PRIVATE PAINTSW_VERSION_STR="${PAINTSW_VERSION_STR}")
+add_test(NAME ui_layout COMMAND paintdotnet_ui_tests)
+set_tests_properties(functional brush_regression security_regression ui_layout PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 180)
 
 # ---- Sample plugin (demonstrates the C ABI; built into build/plugins) ----

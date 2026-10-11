@@ -4,6 +4,7 @@
 #include "theme.h"
 #include "core/document.h"
 #include "canvas/canvaswidget.h"
+#include "canvas/canvasview.h"
 #include "panels/layerspanel.h"
 #include "panels/colorspanel.h"
 #include "panels/historypanel.h"
@@ -92,6 +93,8 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QCloseEvent>
+#include <QShowEvent>
+#include <QScreen>
 #include <QApplication>
 #include <QDragEnterEvent>
 #include <QDropEvent>
@@ -138,6 +141,17 @@ static QString appTitleSuffix() {
     return QStringLiteral(" - paint.software " PAINTSW_VERSION_STR);
 }
 
+static bool nativeWayland() {
+    return QGuiApplication::platformName().startsWith(QLatin1String("wayland"));
+}
+
+static QString dockStateKey() {
+    // Native Wayland needs a docked layout; don't replace the independently
+    // positioned floating layout used by X11/XWayland (or other desktops).
+    return nativeWayland() ? QStringLiteral("ui/mainWindowStateV8Wayland")
+                           : QStringLiteral("ui/mainWindowStateV8");
+}
+
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     setWindowTitle(TR("Sans titre") + appTitleSuffix());
     resize(1400, 900);
@@ -161,9 +175,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
     m_activeDocIndex = 0;
 
     // Canvas
-    m_canvas = new CanvasWidget(this);
+    auto *canvasView = new CanvasView(this);
+    m_canvas = canvasView->canvas();
     m_canvas->setDocument(m_document);
-    setCentralWidget(m_canvas);
+    setCentralWidget(canvasView);
 
     createTools();
     createToolsPanel();
@@ -206,25 +221,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 
     // Select brush tool by default
     selectTool(ToolType::Brush);
-    // Place the four utility windows where paint.net puts them (Tools left,
-    // History/Layers/Colors stacked right). resetUtilityWindow anchors them to
-    // the app frame, so re-running it at every startup gives the same arrangement
-    // whatever the window size is — coordinates saved by a differently sized
-    // session would otherwise put them anywhere, even off-screen. Panels the user
-    // docked or closed are left as they are.
-    // Deferred so the docks are real top-level windows and the window manager has
-    // finalised the main window's geometry (otherwise frameGeometry() is still
-    // (0,0), the docks land outside the frame and move() is ignored).
-    QTimer::singleShot(250, this, [this]() {
-        for (QDockWidget *dock : {m_toolsDock, m_historyDock, m_layersDock, m_colorsDock}) {
-            // window() != this, not isFloating(): a panel Qt has wrapped in a
-            // QDockWidgetGroupWindow is its own window but reports isFloating()
-            // false, and would keep whatever size the saved state gave it.
-            if (dock && !dock->isHidden() && dock->window() != this)
-                resetUtilityWindow(dock);
-        }
-        m_canvas->resetToDefaultView();   // re-centre once sizes are final
-    });
+    // Dock state is restored after the main window is shown. Showing utility
+    // windows from this constructor can leave them unmapped behind their parent.
     updateTitle();
 
     // Apply the current colour scheme (light / dark / follow-OS).
@@ -258,32 +256,71 @@ void MainWindow::loadUiState() {
     if (!geoB64.isEmpty()) {
         restoreGeometry(QByteArray::fromBase64(geoB64.toLatin1()));
     }
+}
 
-    // Versioned layout persistence; any older saved state is intentionally
-    // ignored. V7 exists because a V6 state was written while GroupedDragging
-    // was on and can carry a QDockWidgetGroupWindow back in — restoring one
-    // re-creates the blank title-less window, and tearing it down again crashes
-    // (issue #10). Dropping those layouts once is the cheap, safe cure.
-    const QString stateB64 = settings.value("ui/mainWindowStateV7").toString();
+void MainWindow::showEvent(QShowEvent *event) {
+    QMainWindow::showEvent(event);
+    if (m_uiStateRestored) return;
+    m_uiStateRestored = true;
+    // Run after show() has submitted the parent window's mapping request.
+    QTimer::singleShot(0, this, &MainWindow::restoreDockState);
+}
+
+void MainWindow::restoreDockState() {
+    QSettings settings("PaintDali", "PaintDali");
+    QScopedValueRollback<bool> restoreGuard(m_restoringState, true);
+    QString stateB64 = settings.value(dockStateKey()).toString();
+    int version = 8;
+    // V7 excluded the unsafe old grouped floating windows. Retain existing
+    // desktop layouts, but migrate native Wayland's unpositionable palettes to
+    // separate dock areas once. The two platform layouts are then independent.
+    if (stateB64.isEmpty() && !nativeWayland()) {
+        stateB64 = settings.value("ui/mainWindowStateV7").toString();
+        version = 7;
+    }
+    bool restored = false;
     if (!stateB64.isEmpty()) {
         const QByteArray savedState = QByteArray::fromBase64(stateB64.toLatin1());
-        // Block normalizeDockLayout while restoreState repositions docks.
-        QScopedValueRollback<bool> restoreGuard(m_restoringState, true);
-        if (!restoreState(savedState, 7)) {
-            settings.remove("ui/mainWindowStateV7");
-            settings.remove("ui/mainWindowGeometry");
-        }
+        restored = restoreState(savedState, version);
+    }
+    if (restored && version == 7) {
+        // Older Wayland sessions could save all four palettes at the compositor's
+        // same default position (often 0,0). Repair that specific broken layout
+        // once, while leaving distinct user-arranged legacy layouts untouched.
+        bool coincident = true;
+        const QPoint first = m_toolsDock->pos();
+        for (QDockWidget *dock : {m_toolsDock, m_historyDock, m_layersDock, m_colorsDock})
+            coincident &= dock->isFloating() && (dock->pos() - first).manhattanLength() <= 16;
+        if (coincident) restored = false;
+    }
+    if (!restored) {
+        for (QDockWidget *dock : {m_toolsDock, m_historyDock, m_layersDock, m_colorsDock})
+            resetUtilityWindow(dock, false);
     }
 
-    auto restoreDock = [&settings](QDockWidget *dock, const char *key, bool defaultVisible) {
+    auto restoreDock = [this, &settings](QDockWidget *dock, const char *key) {
         if (!dock) return;
-        dock->setVisible(settings.value(key, defaultVisible).toBool());
+        if (nativeWayland() && dock->isFloating())
+            resetUtilityWindow(dock, false);
+        // Explicitly apply the user's visibility choice after restoring the
+        // layout, including a hide/show when Qt considers an unmapped dock shown.
+        const bool visible = settings.value(key, true).toBool();
+        const bool floating = dock->isFloating();
+        const QRect geometry = dock->geometry();
+        dock->hide();
+        dock->setVisible(visible);
+        if (floating && !dock->isFloating()) {
+            dock->setFloating(true);
+            dock->setGeometry(geometry);
+            dock->setVisible(visible);
+        }
+        if (!nativeWayland()) keepUtilityWindowOnScreen(dock);
     };
 
-    restoreDock(m_toolsDock, "ui/toolsVisible", true);
-    restoreDock(m_historyDock, "ui/historyVisible", true);
-    restoreDock(m_layersDock, "ui/layersVisible", true);
-    restoreDock(m_colorsDock, "ui/colorsVisible", true);
+    restoreDock(m_toolsDock, "ui/toolsVisible");
+    restoreDock(m_historyDock, "ui/historyVisible");
+    restoreDock(m_layersDock, "ui/layersVisible");
+    restoreDock(m_colorsDock, "ui/colorsVisible");
 
     // restoreState() does NOT emit dockLocationChanged, so re-apply the tools
     // palette orientation to match the restored dock area (single thin row when
@@ -295,6 +332,11 @@ void MainWindow::loadUiState() {
         if (horizontal)
             QTimer::singleShot(0, this, [this]() { resizeDocks({m_toolsDock}, {30}, Qt::Vertical); });
     }
+    QTimer::singleShot(0, this, [this]() { m_canvas->resetToDefaultView(); });
+    if (isMinimized()) {
+        m_minimized = false;
+        syncUtilityWindowsToMainState();
+    }
 }
 
 void MainWindow::saveUiState() {
@@ -302,12 +344,18 @@ void MainWindow::saveUiState() {
 
     // Store as base64 strings to avoid Qt INI format corrupting binary QByteArray data.
     settings.setValue("ui/mainWindowGeometry", QString(saveGeometry().toBase64()));
-    settings.setValue("ui/mainWindowStateV7", QString(saveState(7).toBase64()));
+    settings.setValue(dockStateKey(), QString(saveState(8).toBase64()));
 
-    if (m_toolsDock) settings.setValue("ui/toolsVisible", m_toolsDock->isVisible());
-    if (m_historyDock) settings.setValue("ui/historyVisible", m_historyDock->isVisible());
-    if (m_layersDock) settings.setValue("ui/layersVisible", m_layersDock->isVisible());
-    if (m_colorsDock) settings.setValue("ui/colorsVisible", m_colorsDock->isVisible());
+    auto saveDock = [this, &settings](QDockWidget *dock, const char *key) {
+        if (!dock) return;
+        // Minimize hides floating palettes temporarily. Inactive dock tabs also
+        // report not visible, but neither case means the user closed the panel.
+        settings.setValue(key, !dock->isHidden() || m_hiddenOnMinimize.contains(dock->window()));
+    };
+    saveDock(m_toolsDock, "ui/toolsVisible");
+    saveDock(m_historyDock, "ui/historyVisible");
+    saveDock(m_layersDock, "ui/layersVisible");
+    saveDock(m_colorsDock, "ui/colorsVisible");
 }
 
 bool MainWindow::eventFilter(QObject *watched, QEvent *event)
@@ -890,12 +938,27 @@ void MainWindow::createMenuBarCornerIcons() {
     menuBar()->setCornerWidget(corner, Qt::TopRightCorner);
 }
 
-void MainWindow::resetUtilityWindow(QDockWidget *dock) {
+void MainWindow::resetUtilityWindow(QDockWidget *dock, bool show) {
     // Restore a utility window to its default floating position, anchored to the
-    // canvas area: Tools hug the left edge, History/Layers/Colors stack down the
-    // right edge — the paint.net default arrangement.
+    // canvas area: Tools/Colors on the left and History/Layers on the right.
     if (!dock || !m_canvas) return;
-    dock->setVisible(true);
+    if (nativeWayland()) {
+        // xdg-shell ignores absolute top-level coordinates. Keep distinct,
+        // movable panel areas inside the main window on native-only Wayland.
+        QScopedValueRollback<bool> guard(m_restoringState, true);
+        const bool left = dock == m_toolsDock || dock == m_colorsDock;
+        const auto area = left ? Qt::LeftDockWidgetArea : Qt::RightDockWidgetArea;
+        dock->setFloating(false);
+        addDockWidget(area, dock);
+        QDockWidget *upper = left ? m_toolsDock : m_historyDock;
+        QDockWidget *lower = left ? m_colorsDock : m_layersDock;
+        if (!upper->isFloating() && !lower->isFloating()
+            && dockWidgetArea(upper) == area && dockWidgetArea(lower) == area)
+            splitDockWidget(upper, lower, Qt::Vertical);
+        resizeDocks({dock}, {left ? 230 : 262}, Qt::Horizontal);
+        if (show) dock->show();
+        return;
+    }
     // Only float it if it is currently docked into the main window. When Qt has
     // wrapped it in a QDockWidgetGroupWindow it is already its own window, and
     // calling setFloating() would tear it out — leaving the emptied group window
@@ -914,9 +977,12 @@ void MainWindow::resetUtilityWindow(QDockWidget *dock) {
     const int rightW = 262;
 
     auto place = [&](int x, int y, int w, int h) {
-        x = std::max(app.left() + 6, std::min(x, app.right() - w - 6));
-        y = std::max(app.top() + 6, std::min(y, app.bottom() - h - 6));
         top->resize(w, h);
+        // Respect the actual size after Qt applies the palette's minimum size
+        // and the window manager adds its frame, not just the requested size.
+        const QSize framedSize = top->frameGeometry().size();
+        x = std::max(app.left() + 6, std::min(x, app.right() - framedSize.width() - 6));
+        y = std::max(app.top() + 6, std::min(y, app.bottom() - framedSize.height() - 6));
         top->move(x, y);
     };
 
@@ -931,8 +997,44 @@ void MainWindow::resetUtilityWindow(QDockWidget *dock) {
         // height from the panel: hard-coding it either crops the palette or, since
         // Qt enforces the minimum anyway, anchors the window too low.
         const int h = std::max(300, top->sizeHint().height());
-        place(app.left() + 28, app.bottom() - h - 76, 230, h);
+        int y = app.bottom() - h - 76;
+        if (m_toolsDock->isFloating())
+            y = std::max(y, m_toolsDock->frameGeometry().bottom() + 12);
+        place(app.left() + 28, y, 230, h);
     }
+    if (show) dock->show();
+    keepUtilityWindowOnScreen(dock);
+}
+
+void MainWindow::keepUtilityWindowOnScreen(QDockWidget *dock) {
+    if (!dock || !dock->isFloating()) return;
+    QWidget *top = dock->window();
+    const QRect frame = top->frameGeometry();
+    QScreen *best = screen();
+    qint64 bestOverlap = 0;
+    for (QScreen *candidate : QGuiApplication::screens()) {
+        const QRect available = candidate->availableGeometry();
+        if (available.contains(frame)) return;
+        const QRect overlap = available.intersected(frame);
+        const qint64 area = qint64(overlap.width()) * overlap.height();
+        if (area > bestOverlap) {
+            best = candidate;
+            bestOverlap = area;
+        }
+    }
+    if (!best) best = QGuiApplication::primaryScreen();
+    if (!best) return;
+    // A removed monitor must not leave an enabled palette unreachable. Keep a
+    // valid saved position as-is; only clamp an out-of-bounds window.
+    const QRect available = best->availableGeometry();
+    const QSize decorations = top->frameGeometry().size() - top->size();
+    top->resize(top->size().boundedTo(available.size() - decorations));
+    const QSize frameSize = top->frameGeometry().size();
+    const int x = qBound(available.left(), frame.left(),
+                         qMax(available.left(), available.right() - frameSize.width() + 1));
+    const int y = qBound(available.top(), frame.top(),
+                         qMax(available.top(), available.bottom() - frameSize.height() + 1));
+    top->move(x, y);
 }
 
 QAction *MainWindow::addShortcutAction(const QString &text, const QList<QKeySequence> &shortcuts,
@@ -1476,33 +1578,13 @@ void MainWindow::createDockPanels() {
         normalizeDockLayout(m_layersDock);
     });
 
-    m_toolsDock->setFloating(true);
-    m_historyDock->setFloating(true);
-    m_layersDock->setFloating(true);
-    m_colorsDock->setFloating(true);
-
-    m_toolsDock->resize(62, 520);
-    m_historyDock->resize(260, 200);
-    m_layersDock->resize(260, 220);
-    m_colorsDock->resize(220, 320);
-
-    QTimer::singleShot(0, this, [this]() {
-        QSettings settings("PaintDali", "PaintDali");
-        if (settings.contains("ui/mainWindowStateV2")) {
-            // A saved layout exists; do not overwrite it with default startup positions.
-            return;
-        }
-
-        const QRect g = geometry();
-        m_toolsDock->move(g.left() + 6, g.top() + 115);
-        m_historyDock->move(g.right() - m_historyDock->width() - 10, g.top() + 115);
-        m_layersDock->move(g.right() - m_layersDock->width() - 10, g.bottom() - m_layersDock->height() - 40);
-        m_colorsDock->move(g.left() + 6, g.bottom() - m_colorsDock->height() - 40);
-        normalizeDockLayout(m_toolsDock);
-        normalizeDockLayout(m_historyDock);
-        normalizeDockLayout(m_layersDock);
-        normalizeDockLayout(m_colorsDock);
-    });
+    for (QDockWidget *dock : {m_toolsDock, m_historyDock, m_layersDock, m_colorsDock}) {
+        if (nativeWayland())
+            dock->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable);
+        // Do not map a floating child before the main window is mapped. First
+        // show restores both geometry and visibility in a single place.
+        dock->hide();
+    }
 }
 
 void MainWindow::createStatusBar() {

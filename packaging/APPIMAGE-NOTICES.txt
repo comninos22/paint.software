@@ -10,8 +10,8 @@ directories. Referenced common licenses are included under common-licenses.
 The Qt SBOMs describe the full SDK modules; some SDK components are omitted.
 
 Corresponding source for the Qt modules and Ubuntu libraries is provided
-as the AppImage-dependency-sources.tar asset beside this AppImage on the
-v1.1.93-security.1 GitHub release. The source manifests give exact upstream
+as the AppImage-dependency-sources.tar asset beside this AppImage on its
+GitHub release. The source manifests give exact upstream
 URLs, versions, and checksums. Qt source is also available from:
 https://download.qt.io/official_releases/qt/6.12/6.12.0/submodules/
 ICU source: https://github.com/unicode-org/icu/tree/release-73-2

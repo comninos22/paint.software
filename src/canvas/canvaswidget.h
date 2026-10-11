@@ -34,7 +34,7 @@ public:
     void centerView();
     QPointF pan() const { return m_pan; }
     // Any explicit pan is a user gesture: stop auto-centring from then on.
-    void setPan(const QPointF &pan) { m_pan = pan; m_autoCenter = false; update(); }
+    void setPan(const QPointF &pan);
 
     // Coordinate conversion
     QPointF widgetToCanvas(const QPointF &widgetPos) const;
@@ -62,6 +62,8 @@ public:
     int rulerSize() const { return m_showRulers ? 20 : 0; }
 
 signals:
+    void viewChanged();
+    void scrollRequested(const QPointF &delta);
     void zoomChanged(double zoom);
     void cursorPositionChanged(const QPoint &pos);
     void canvasModified();
@@ -88,6 +90,7 @@ private:
     void updateMarchingAnts();
 
     Document *m_document = nullptr;
+    QMetaObject::Connection m_documentSizeConnection;
     Tool *m_currentTool = nullptr;
 
     double m_zoom = 1.0;
