@@ -72,6 +72,7 @@ int main(int argc, char **argv) {
     rejects(nativeFile(1, 0, 0, 1, {std::numeric_limits<int>::min(), 0}), "overflow-prone offset");
     rejects(nativeFile(1, 0, 0, 1, {}, {1, 1}), "layer/canvas size mismatch");
     rejects(good + "junk", "trailing data");
+    rejects(word(good, good.size() - 4, 0), "invalid PNG end checksum");
 
     if (!qEnvironmentVariableIsSet("PAINTSW_BASELINE_TEST")) {
         rejects(word(good, 0, 0), "wrong magic");

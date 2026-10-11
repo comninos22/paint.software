@@ -14,6 +14,26 @@
 // Magic number for the native layered format: 'P','S','W','1'.
 static const quint32 kPswMagic = 0x50535731;
 
+// Qt/libpng can return pixels even when the final PNG checksum is truncated.
+// Walk bounded chunk headers without allocating their payloads, so a native
+// layer must contain a complete PNG before the decoder sees it.
+static qint64 nativePngEnd(QFile &file, qint64 imageStart) {
+    qint64 pos = imageStart + 12; // QImage marker + PNG signature
+    for (int chunks = 0; chunks < 65536; ++chunks) {
+        if (pos > file.size() - 12 || !file.seek(pos)) return -1;
+        const QByteArray header = file.read(8);
+        if (header.size() != 8) return -1;
+        const quint32 length = qFromBigEndian<quint32>(header.constData());
+        if (qint64(length) > file.size() - pos - 12) return -1;
+        if (header.mid(4, 4) == "IEND") {
+            if (length != 0 || file.read(4) != QByteArray::fromHex("ae426082")) return -1;
+            return pos + 12;
+        }
+        pos += qint64(length) + 12;
+    }
+    return -1;
+}
+
 Document::Document(int width, int height, QObject *parent)
     : QObject(parent), m_width(width), m_height(height), m_selection(width, height)
 {
@@ -447,9 +467,12 @@ bool Document::loadNative(const QString &filePath) {
         if (!ImageLimits::validSize(iw, ih) || iw != quint32(w) || ih != quint32(h)) return false;
         totalPixels += qint64(iw) * ih;
         if (totalPixels > ImageLimits::MaxDocumentPixels) return false;
+        const qint64 imageStart = file.pos();
+        const qint64 imageEnd = nativePngEnd(file, imageStart);
+        if (imageEnd < 0 || !file.seek(imageStart)) return false;
         in >> img;
         if (in.status() != QDataStream::Ok || img.isNull()) return false;
-        if (img.size() != QSize(int(iw), int(ih))) return false;
+        if (img.size() != QSize(int(iw), int(ih)) || file.pos() != imageEnd) return false;
         auto layer = std::make_shared<Layer>(img, name);
         if (layer->image().isNull()) return false;
         layer->setOpacity(opacity);

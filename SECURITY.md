@@ -1,6 +1,6 @@
 # Security policy for the comninos22 fork
 
-The initial reviewed release is `v1.1.2-security.1`. Review scope and remaining limitations are recorded
+The initial reviewed release is `v1.1.93-security.1`. Review scope and remaining limitations are recorded
 in [docs/security-review.md](docs/security-review.md). No support response time is promised.
 
 Report suspected vulnerabilities through this fork's

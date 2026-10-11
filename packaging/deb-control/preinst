@@ -41,7 +41,7 @@ cat >&2 <<EOF
   Il faut Qt ${QT_MIN} ou plus récent. Ce système a Qt ${qtver}.
 
   Supported / Pris en charge :
-    Ubuntu 24.04+   ·   Debian 12+   ·   Linux Mint 22+   ·   LMDE 6+
+    Ubuntu 24.04 amd64 and compatible derivatives / dérivées compatibles
 
   Ubuntu 22.04 and Linux Mint 21 ship Qt 6.2 and cannot run this build.
   Ubuntu 22.04 et Linux Mint 21 fournissent Qt 6.2 et ne peuvent pas
@@ -51,7 +51,7 @@ cat >&2 <<EOF
     - Upgrade your distribution / Mettez à niveau votre distribution
     - Or build from source against your Qt:
       Ou compilez depuis les sources avec votre Qt :
-      https://github.com/Univers4craft/paint.software#-build-from-source
+      https://github.com/comninos22/paint.software#build-and-test
 
 EOF
 exit 1

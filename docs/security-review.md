@@ -18,7 +18,7 @@ Previously published upstream binaries were not downloaded or verified against s
 | Finding | Assessment | Change in this fork |
 | --- | --- | --- |
 | Native `.psw` dimensions and aggregate layer memory are not bounded; QString lengths are deserialized before validation | Crafted-file resource exhaustion risk; the original limit of 4,096 layers is not a practical memory budget | Validate encoded file size, dimensions, pixel budget, layer count and name length before allocation; check embedded PNG headers |
-| Native format version, active index, enum, opacity, offsets and layer/canvas consistency are insufficiently validated | Invalid state, overflow-prone coordinates and crashes are possible; arbitrary code execution has not been established | Reject unsupported versions, invalid indices/booleans/blends, NaN/infinity, excessive offsets, mismatched dimensions, truncation and trailing data; preserve the current document on rejection |
+| Native format version, active index, enum, opacity, offsets and layer/canvas consistency are insufficiently validated | Confirmed acceptance of invalid metadata and signed-integer overflow during rendering with a small crafted file; arbitrary code execution has not been established | Reject unsupported versions, invalid indices/booleans/blends, NaN/infinity, excessive offsets, mismatched dimensions, truncation and trailing data; preserve the current document on rejection |
 | AppImage workflow selects Qt 6.5.3 and qtimageformats | Qt 6.5.3 is within the affected versions of the published ICNS crash vulnerability CVE-2025-5683; this is a dependency finding, not evidence of intent | Retire this AppImage pipeline; ship a distribution-linked `.deb`, and restrict Open/Import to the advertised raster formats |
 | AppImage tools are downloaded from mutable `continuous` URLs without integrity pins; aqtinstall and Actions use mutable references | Build supply-chain exposure, with no compromise demonstrated | Remove external AppImage downloads; pin remaining Actions to exact commits; use distribution package repositories |
 | APT publishing falls back to unsigned metadata and recommends `trusted=yes` if signing secrets are absent | Integrity bypass by design in the fallback configuration; upstream's live APT deployment was not tested | Remove APT deployment and unsigned install instructions from active fork documentation |
@@ -38,7 +38,19 @@ The repository includes a dedicated `security_regression` test covering valid Qt
 invalid header fields and metadata, excessive dimensions/name lengths, layer count and aggregate budgets,
 embedded PNG header validation, truncation, trailing data, failed-load state preservation, format filtering,
 and failed-save preservation. The original functional and brush regression suites remain available.
-Release verification results will be recorded here after execution; test code alone is not evidence of a passing run.
+Executed locally in an isolated Ubuntu 24.04 container, building/running as UID 65534:
+
+- Release application and all test targets: built successfully with GCC 13.3 and Qt 6.4.2 distribution packages.
+- CTest: **3/3 passed** (functional, brush_regression, security_regression).
+- AddressSanitizer + UndefinedBehaviorSanitizer: **1/1 security suite passed**, with undefined behavior configured to halt the test. Leak detection was disabled; this is not a leak-cleanliness claim.
+- Upstream baseline: four small invalid-metadata fixtures were accepted. Rendering a two-pixel-wide native layer with an extreme offset triggered a UBSan signed-integer-overflow diagnostic in `Layer::composited`; the hardened reader rejects it.
+- The truncation tests initially exposed Qt accepting an incomplete PNG end checksum. A bounded PNG chunk walk and explicit end-checksum validation were added; all truncation cases then passed.
+- Cppcheck 2.13 examined 97 implementation files with Qt library modeling. It reported three initialization-list performance suggestions and one uninitialized `m_after` warning. Manual inspection confirmed `m_after` is read only after `m_hasAfter` is set by `captureAfter`; these diagnostics did not establish another exploitable bug. System headers were not modeled by that scan.
+- Offscreen application startup remained running until the intentional three-second smoke-test timeout.
+- Debian package inspection confirmed the personal-fork homepage/maintainer, bundled MIT license, system Qt dependencies, and RELRO/BIND_NOW linker hardening.
+- Workflow YAML and package shell syntax checks passed.
+
+GitHub Actions could not start: the account is locked for an Actions billing issue. The failed hosted runs are infrastructure failures, not passing checks. The local commands above were actually executed. The repository restricts Actions to the exact pinned checkout/upload-artifact revisions and requires commit pinning.
 
 Source inspection also checked process/network/file-loading entry points, plugin registration and sample
 code, package maintainer scripts, and workflow triggers/permissions. A limited credential-pattern scan

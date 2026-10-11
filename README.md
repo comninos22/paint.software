@@ -16,7 +16,7 @@ Other distributions, including Fedora, can build from source below.
 
 ```sh
 sha256sum -c SHA256SUMS
-sudo apt install ./paint.software_1.1.2_amd64.deb
+sudo apt install ./paint.software_1.1.93_amd64.deb
 ```
 
 There is no APT repository, bundled AppImage, or Flatpak release for this fork. The package uses the

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(PaintDali VERSION 1.1.2 LANGUAGES C CXX)
+project(PaintDali VERSION 1.1.93 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -186,6 +186,7 @@ target_link_libraries(paintdotnet PRIVATE
 target_compile_definitions(paintdotnet PRIVATE PAINTSW_VERSION_STR="${PAINTSW_VERSION_STR}")
 
 install(TARGETS paintdotnet DESTINATION bin)
+install(FILES LICENSE DESTINATION share/doc/paint.software)
 
 # ---- Test harness (headless functional tests) ----
 set(NONMAIN_SOURCES
