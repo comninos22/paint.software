@@ -1,11 +1,15 @@
 #include "document.h"
+#include "imagelimits.h"
 #include <QPainter>
 #include <QImageReader>
 #include <QImageWriter>
 #include <cstdlib>
 #include <QFileInfo>
 #include <QFile>
+#include <QSaveFile>
 #include <QDataStream>
+#include <QtEndian>
+#include <cmath>
 
 // Magic number for the native layered format: 'P','S','W','1'.
 static const quint32 kPswMagic = 0x50535731;
@@ -351,7 +355,18 @@ bool Document::isNativeFormat(const QString &filePath) {
 }
 
 bool Document::saveNative(const QString &filePath) {
-    QFile file(filePath);
+    if (!ImageLimits::validSize(m_width, m_height) || m_layers.empty()
+        || m_layers.size() > ImageLimits::MaxLayers
+        || qint64(m_width) * m_height * (qint64(m_layers.size()) + 1)
+               > ImageLimits::MaxDocumentPixels) return false;
+    for (const auto &layer : m_layers) {
+        if (layer->image().size() != size() || layer->name().size() > ImageLimits::MaxNameBytes / 2
+            || !std::isfinite(layer->opacity())
+            || qAbs(qint64(layer->offset().x())) > ImageLimits::MaxDimension
+            || qAbs(qint64(layer->offset().y())) > ImageLimits::MaxDimension) return false;
+    }
+    // Never truncate the existing document until the complete replacement is ready.
+    QSaveFile file(filePath);
     if (!file.open(QIODevice::WriteOnly)) return false;
     QDataStream out(&file);
     out.setVersion(QDataStream::Qt_6_0);
@@ -369,14 +384,16 @@ bool Document::saveNative(const QString &filePath) {
         out << l->offset();
         out << l->image();
     }
-    if (out.status() != QDataStream::Ok) return false;
-    file.close();
+    if (out.status() != QDataStream::Ok || file.size() > ImageLimits::MaxFileBytes) return false;
+    if (!file.commit()) return false;
     m_filePath = filePath;
     m_modified = false;
     return true;
 }
 
 bool Document::loadNative(const QString &filePath) {
+    const QFileInfo info(filePath);
+    if (!info.isFile() || info.size() > ImageLimits::MaxFileBytes) return false;
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly)) return false;
     QDataStream in(&file);
@@ -387,20 +404,54 @@ bool Document::loadNative(const QString &filePath) {
     if (magic != kPswMagic) return false;
     qint32 version = 0, w = 0, h = 0, active = 0, count = 0;
     in >> version >> w >> h >> active >> count;
-    if (w <= 0 || h <= 0 || count <= 0 || count > 4096) return false;
+    if (in.status() != QDataStream::Ok || version != 1
+        || !ImageLimits::validSize(w, h) || count <= 0 || count > ImageLimits::MaxLayers
+        || active < 0 || active >= count
+        || qint64(w) * h * (qint64(count) + 1) > ImageLimits::MaxDocumentPixels) return false;
 
     std::vector<std::shared_ptr<Layer>> layers;
     layers.reserve(count);
+    qint64 totalPixels = qint64(w) * h; // include the canvas/selection budget
     for (int i = 0; i < count; ++i) {
+        // QDataStream's QString operator trusts its length. Check it before it
+        // can request an attacker-controlled allocation (Qt_6_0 uses a u32).
+        const QByteArray lengthBytes = file.peek(4);
+        if (lengthBytes.size() != 4) return false;
+        const quint32 nameBytes = qFromBigEndian<quint32>(lengthBytes.constData());
+        if (nameBytes != 0xffffffffU
+            && (nameBytes > ImageLimits::MaxNameBytes || (nameBytes % 2) != 0
+                || qint64(nameBytes) > file.bytesAvailable() - 4)) return false;
         QString name;
         float opacity = 1.0f;
-        bool visible = true, locked = false;
+        quint8 visible = 1, locked = 0;
         qint32 blend = 0;
         QPoint offset;
         QImage img;
-        in >> name >> opacity >> visible >> locked >> blend >> offset >> img;
+        in >> name >> opacity >> visible >> locked >> blend >> offset;
+        if (in.status() != QDataStream::Ok || !std::isfinite(opacity)
+            || opacity < 0.0f || opacity > 1.0f || visible > 1 || locked > 1
+            || blend < 0 || blend > static_cast<int>(BlendMode::Overwrite)
+            || qAbs(qint64(offset.x())) > ImageLimits::MaxDimension
+            || qAbs(qint64(offset.y())) > ImageLimits::MaxDimension) return false;
+
+        // Qt_6_0 QImage serialization is a non-null marker followed by PNG.
+        // Validate IHDR dimensions before allowing the codec to allocate pixels.
+        const QByteArray header = file.peek(28);
+        if (header.size() != 28 || qFromBigEndian<quint32>(header.constData()) != 1
+            || header.mid(4, 8) != QByteArray::fromHex("89504e470d0a1a0a")
+            || qFromBigEndian<quint32>(header.constData() + 12) != 13
+            || header.mid(16, 4) != "IHDR") return false;
+        const quint32 iw = qFromBigEndian<quint32>(header.constData() + 20);
+        const quint32 ih = qFromBigEndian<quint32>(header.constData() + 24);
+        // Tools assume every layer has the canvas size.
+        if (!ImageLimits::validSize(iw, ih) || iw != quint32(w) || ih != quint32(h)) return false;
+        totalPixels += qint64(iw) * ih;
+        if (totalPixels > ImageLimits::MaxDocumentPixels) return false;
+        in >> img;
         if (in.status() != QDataStream::Ok || img.isNull()) return false;
+        if (img.size() != QSize(int(iw), int(ih))) return false;
         auto layer = std::make_shared<Layer>(img, name);
+        if (layer->image().isNull()) return false;
         layer->setOpacity(opacity);
         layer->setVisible(visible);
         layer->setLocked(locked);
@@ -408,6 +459,7 @@ bool Document::loadNative(const QString &filePath) {
         layer->setOffset(offset);
         layers.push_back(layer);
     }
+    if (!file.atEnd()) return false;
 
     m_width = w;
     m_height = h;
@@ -449,9 +501,11 @@ bool Document::save(const QString &filePath, int quality) {
         flat = opaque;
     }
 
-    QImageWriter writer(filePath);
+    QSaveFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly)) return false;
+    QImageWriter writer(&file, suffix.toLatin1());
     if (quality >= 0) writer.setQuality(quality);
-    if (writer.write(flat)) {
+    if (writer.write(flat) && file.commit()) {
         m_filePath = filePath;
         m_modified = false;
         return true;
@@ -459,18 +513,35 @@ bool Document::save(const QString &filePath, int quality) {
     return false;
 }
 
+QImage Document::readImage(const QString &filePath) {
+    const QFileInfo info(filePath);
+    if (!info.isFile() || info.size() > ImageLimits::MaxFileBytes) return {};
+    QImageReader reader(filePath);
+    reader.setDecideFormatFromContent(true);
+    // Only the advertised raster formats: avoid invoking unrelated plugins
+    // (e.g. ICNS or SVG) merely because a file was renamed to .png.
+    const QByteArray format = reader.format().toLower();
+    if (format != "png" && format != "jpeg" && format != "jpg" && format != "bmp"
+        && format != "gif" && format != "tiff" && format != "tif" && format != "webp") return {};
+    if (!ImageLimits::validSize(reader.size())) return {};
+    QImage image = reader.read();
+    if (image.isNull() || !ImageLimits::validSize(image.size())) return {};
+    return image;
+}
+
 bool Document::load(const QString &filePath) {
     if (isNativeFormat(filePath))
         return loadNative(filePath);
 
-    QImageReader reader(filePath);
-    QImage image = reader.read();
+    QImage image = readImage(filePath);
     if (image.isNull()) return false;
+
+    auto layer = std::make_shared<Layer>(image, "Background");
+    if (layer->image().isNull()) return false;
 
     m_width = image.width();
     m_height = image.height();
     m_layers.clear();
-    auto layer = std::make_shared<Layer>(image, "Background");
     m_layers.push_back(layer);
     m_activeLayer = 0;
     m_selection = Selection(m_width, m_height);

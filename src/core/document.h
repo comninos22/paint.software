@@ -89,6 +89,8 @@ public:
     // like Paint.NET remembering its Save Configuration).
     bool save(const QString &filePath, int quality = -1);
     bool load(const QString &filePath);
+    // Shared, bounded raster decoder for Open and Import Layer.
+    static QImage readImage(const QString &filePath);
     // Native layered format (.psw) — preserves every layer, not just a flattened
     // image. Used automatically when the path ends in ".psw".
     bool saveNative(const QString &filePath);

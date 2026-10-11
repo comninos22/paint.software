@@ -629,12 +629,16 @@ void MainWindow::populatePluginsMenu(QMenu *pluginsMenu) {
 
     if (!m_pluginManager) {
         m_pluginManager = std::make_unique<PluginManager>();
-        m_pluginManager->loadFrom(PluginManager::defaultPluginDirs());
+        // Native libraries execute code as soon as they are loaded, even before
+        // their registration symbol is checked. Require deliberate opt-in.
+        if (qEnvironmentVariable("PAINTSW_ENABLE_PLUGINS") == "1")
+            m_pluginManager->loadFrom(PluginManager::defaultPluginDirs());
     }
 
     const auto &effects = m_pluginManager->effects();
     if (effects.empty()) {
-        QAction *none = pluginsMenu->addAction(TR("Aucun plugin chargé"));
+        QAction *none = pluginsMenu->addAction(qEnvironmentVariable("PAINTSW_ENABLE_PLUGINS") == "1"
+            ? TR("Aucun plugin chargé") : QStringLiteral("Native plugins disabled (see README)"));
         none->setEnabled(false);
     } else {
         for (const auto &eff : effects) {
@@ -2070,7 +2074,7 @@ void MainWindow::importLayerFromFile() {
     const QString file = QFileDialog::getOpenFileName(this, TR("Importer un calque depuis un fichier"),
         QString(), TR("Images (*.png *.jpg *.jpeg *.bmp *.gif *.tiff *.webp)"));
     if (file.isEmpty()) return;
-    QImage img(file);
+    QImage img = Document::readImage(file);
     if (img.isNull()) {
         QMessageBox::warning(this, TR("Erreur"), TR("Impossible de charger le fichier image."));
         return;

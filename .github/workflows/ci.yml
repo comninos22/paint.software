@@ -1,37 +1,35 @@
 name: CI
-
-# Builds the app and runs the test suite on every push and pull request,
-# so any change (including outside contributors' PRs) is verified automatically.
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Install Qt6 and build tools
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Install distribution build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build \
-            qt6-base-dev qt6-image-formats-plugins libgl1-mesa-dev
-
-      - name: Configure
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build application
-        run: cmake --build build -j
-
-      - name: Build tests
-        run: cmake --build build --target paintdotnet_tests -j
-
-      - name: Run tests (headless)
+          sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build qt6-base-dev qt6-image-formats-plugins libgl1-mesa-dev
+      - name: Build and test
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target all paintdotnet_tests paintdotnet_brush_tests paintdotnet_security_tests -j2
+          ctest --test-dir build --output-on-failure
+      - name: Sanitize the untrusted-file reader
         env:
-          QT_QPA_PLATFORM: offscreen
-        run: ./build/paintdotnet_tests
+          ASAN_OPTIONS: detect_leaks=0
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          cmake -B build-sanitize -G Ninja -DCMAKE_BUILD_TYPE=Debug -DPAINTSW_SANITIZERS=ON
+          cmake --build build-sanitize --target paintdotnet_security_tests -j2
+          ctest --test-dir build-sanitize -R security_regression --output-on-failure

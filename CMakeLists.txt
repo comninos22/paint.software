@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(PaintDali VERSION 1.1.1 LANGUAGES C CXX)
+project(PaintDali VERSION 1.1.2 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -7,7 +7,17 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui PrintSupport)
+find_package(Qt6 6.4 REQUIRED COMPONENTS Widgets Core Gui PrintSupport)
+
+option(PAINTSW_SANITIZERS "Enable address and undefined-behavior sanitizers" OFF)
+if(PAINTSW_SANITIZERS AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+  add_link_options(-fsanitize=address,undefined)
+endif()
+if(UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  add_compile_options(-fstack-protector-strong)
+  add_link_options(-Wl,-z,relro,-z,now)
+endif()
 
 # Single source of truth for the version shown to users. CI passes
 # -DPAINTSW_VERSION=<major.minor.commitcount>; a local build falls back to the
@@ -207,9 +217,14 @@ add_executable(paintdotnet_brush_tests EXCLUDE_FROM_ALL
 target_include_directories(paintdotnet_brush_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(paintdotnet_brush_tests PRIVATE Qt6::Widgets Qt6::Core Qt6::Gui)
 enable_testing()
+add_executable(paintdotnet_security_tests EXCLUDE_FROM_ALL tests/test_security.cpp ${CORE_SOURCES})
+target_include_directories(paintdotnet_security_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(paintdotnet_security_tests PRIVATE Qt6::Widgets Qt6::Core Qt6::Gui)
+add_test(NAME security_regression COMMAND paintdotnet_security_tests)
 add_test(NAME functional COMMAND paintdotnet_tests)
 add_test(NAME brush_regression COMMAND paintdotnet_brush_tests)
-set_tests_properties(functional brush_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+set_tests_properties(functional brush_regression security_regression PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 180)
 
 # ---- Sample plugin (demonstrates the C ABI; built into build/plugins) ----
 # A MODULE library is a shared object meant to be dlopen'd, never linked against.
@@ -224,7 +239,7 @@ set_target_properties(sample_sepia_plugin PROPERTIES
 # ---- Desktop integration (installed by the package) ----
 install(FILES packaging/paint.software.desktop DESTINATION share/applications)
 # AppStream metadata, so software centres and the AppImage describe the app.
-install(FILES packaging/io.github.univers4craft.PaintSoftware.metainfo.xml
+install(FILES packaging/io.github.comninos22.PaintSoftware.metainfo.xml
         DESTINATION share/metainfo)
 install(FILES src/resources/paintdali-logo.png
         DESTINATION share/pixmaps RENAME paint.software.png)
@@ -234,17 +249,17 @@ install(TARGETS sample_sepia_plugin LIBRARY DESTINATION lib/paint.software/plugi
 
 # ---- CPack: build a Debian package with `cpack -G DEB` ----
 set(CPACK_PACKAGE_NAME "paint.software")
-set(CPACK_PACKAGE_VENDOR "Univers4craft")
+set(CPACK_PACKAGE_VENDOR "comninos22 (fork of Univers4craft/paint.software)")
 # CI passes -DPAINTSW_VERSION=<major.minor.commitcount> so every push to main
 # produces a higher version that APT sees as an upgrade; otherwise use PROJECT_VERSION.
 set(CPACK_PACKAGE_VERSION "${PAINTSW_VERSION_STR}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Open-source Paint.NET clone for Linux (C++/Qt6)")
-set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/Univers4craft/paint.software")
-set(CPACK_PACKAGE_CONTACT "Univers4craft <Univers4craft@users.noreply.github.com>")
+set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/comninos22/paint.software")
+set(CPACK_PACKAGE_CONTACT "comninos22 <51789730+comninos22@users.noreply.github.com>")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 
 set(CPACK_GENERATOR "DEB")
-set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Univers4craft <Univers4craft@users.noreply.github.com>")
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${CPACK_PACKAGE_CONTACT}")
 set(CPACK_DEBIAN_PACKAGE_SECTION "graphics")
 set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
 set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "${CPACK_PACKAGE_HOMEPAGE_URL}")

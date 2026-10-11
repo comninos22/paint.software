@@ -1,3 +1,5 @@
+> In the comninos22 fork, native plugins are disabled by default. Enable only trusted code with `PAINTSW_ENABLE_PLUGINS=1 paintdotnet` (or the local build path). Loading a library executes its native code before registration checks; plugins are not sandboxed.
+
 # paint.software plugins — developer guide
 
 paint.software loads **external effect plugins**, exactly like Paint.NET: a plugin is

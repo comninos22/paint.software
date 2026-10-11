@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>io.github.univers4craft.PaintSoftware</id>
+  <id>io.github.comninos22.PaintSoftware</id>
   <metadata_license>MIT</metadata_license>
   <project_license>MIT</project_license>
   <name>paint.software</name>
@@ -45,18 +45,18 @@
     <keyword>paint.net</keyword>
   </keywords>
 
-  <url type="homepage">https://github.com/Univers4craft/paint.software</url>
-  <url type="bugtracker">https://github.com/Univers4craft/paint.software/issues</url>
+  <url type="homepage">https://github.com/comninos22/paint.software</url>
+  <url type="bugtracker">https://github.com/comninos22/paint.software/issues</url>
 
   <screenshots>
     <screenshot type="default">
       <caption>paint.software running on Linux</caption>
-      <image>https://raw.githubusercontent.com/Univers4craft/paint.software/main/docs/screenshot.png</image>
+      <image>https://raw.githubusercontent.com/comninos22/paint.software/main/docs/screenshot.png</image>
     </screenshot>
   </screenshots>
 
-  <developer id="io.github.univers4craft">
-    <name>Univers4craft</name>
+  <developer id="io.github.comninos22">
+    <name>comninos22; based on Univers4craft and contributors</name>
   </developer>
 
   <content_rating type="oars-1.1" />
