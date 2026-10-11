@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(PaintDali VERSION 1.1.94 LANGUAGES C CXX)
+project(PaintDali VERSION 1.1.95 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -215,7 +215,7 @@ target_link_libraries(paintdotnet_tests PRIVATE
 
 add_executable(paintdotnet_brush_tests EXCLUDE_FROM_ALL
     tests/test_brush.cpp tests/referencebrush.cpp
-    ${CORE_SOURCES} ${CANVAS_SOURCES} src/tools/tool.cpp src/tools/brushtool.cpp)
+    ${CORE_SOURCES} ${CANVAS_SOURCES} src/i18n.cpp src/tools/tool.cpp src/tools/brushtool.cpp)
 target_include_directories(paintdotnet_brush_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(paintdotnet_brush_tests PRIVATE Qt6::Widgets Qt6::Core Qt6::Gui)
 enable_testing()

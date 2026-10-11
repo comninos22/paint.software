@@ -1,4 +1,5 @@
 #include "canvasview.h"
+#include "i18n.h"
 #include "canvaswidget.h"
 #include "core/document.h"
 #include <QGridLayout>
@@ -20,8 +21,7 @@ CanvasView::CanvasView(QWidget *parent) : QWidget(parent),
     layout->setRowStretch(0, 1);
     layout->setColumnStretch(0, 1);
     setFocusProxy(m_canvas);
-    m_horizontal->setAccessibleName(tr("Horizontal canvas scroll bar"));
-    m_vertical->setAccessibleName(tr("Vertical canvas scroll bar"));
+    retranslate();
     m_horizontal->setSingleStep(20);
     m_vertical->setSingleStep(20);
 
@@ -72,4 +72,9 @@ void CanvasView::scrollBy(const QPointF &delta) {
     const QPointF next(moveAxis(m_horizontal, pan.x(), delta.x()),
                        moveAxis(m_vertical, pan.y(), delta.y()));
     if (next != pan) m_canvas->setPan(next);
+}
+
+void CanvasView::retranslate() {
+    m_horizontal->setAccessibleName(TR("Barre de défilement horizontale du canevas"));
+    m_vertical->setAccessibleName(TR("Barre de défilement verticale du canevas"));
 }

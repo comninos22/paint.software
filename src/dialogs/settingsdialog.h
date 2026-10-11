@@ -7,6 +7,8 @@ class QStackedWidget;
 class QComboBox;
 class QCheckBox;
 class QSlider;
+class QLabel;
+class QPushButton;
 
 // Mirrors paint.net's Settings dialog: a category list on the left, a stacked
 // page on the right, and a Close button.
@@ -23,6 +25,7 @@ signals:
     void canvasSettingsChanged();
 
 private:
+    void retranslate();
     QWidget *buildUserInterfacePage();
     QWidget *buildCanvasPage();
     QWidget *buildPlaceholderPage(const QString &text);
@@ -33,4 +36,6 @@ private:
     QComboBox *m_schemeCombo;
     QComboBox *m_languageCombo;
     QSlider *m_checkerSlider;
+    QLabel *m_languageLabel, *m_schemeLabel, *m_checkerLabel, *m_note;
+    QPushButton *m_closeBtn;
 };

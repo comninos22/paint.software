@@ -17,20 +17,29 @@ Replace the AppImage with an updated release to update its bundled libraries.
 The `.deb` uses distribution Qt libraries; keep the operating system and image codecs updated.
 
 ```sh
-chmod +x paint.software-1.1.94-x86_64.AppImage
-./paint.software-1.1.94-x86_64.AppImage
+chmod +x paint.software-1.1.95-x86_64.AppImage
+./paint.software-1.1.95-x86_64.AppImage
 # If FUSE is unavailable:
-./paint.software-1.1.94-x86_64.AppImage --appimage-extract-and-run
+./paint.software-1.1.95-x86_64.AppImage --appimage-extract-and-run
 ```
 
 ```sh
 sha256sum --ignore-missing -c SHA256SUMS
-sudo apt install ./paint.software_1.1.94_amd64.deb
+sudo apt install ./paint.software_1.1.95_amd64.deb
 ```
 
 There is no APT repository or Flatpak release for this fork. The Debian package uses the
 same `paintdotnet` executable and package name as upstream and replaces an installed upstream package.
 Checksums detect corruption; they are not an independent publisher signature.
+
+## Languages
+
+Choose **Settings → User Interface → Language → Ελληνικά** for Greek.
+The interface updates immediately and remembers the selection after restarting.
+English and French remain available by their native names. Greek translations are
+compiled into the app and work offline, including fallback labels for Qt's standard
+buttons, file chooser and color picker. Native system dialogs may follow the desktop language.
+Existing filenames, user-created layer names and third-party plugin text are preserved.
 
 ## Build and test
 

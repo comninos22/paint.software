@@ -25,7 +25,7 @@
       <li>Layers with opacity, blend modes and smart merge</li>
       <li>Native .psw format, plus PNG/JPEG/BMP/GIF/TIFF/WebP</li>
       <li>Selections, effects, adjustments and a plugin system</li>
-      <li>Light and dark themes; English and French</li>
+      <li>Light and dark themes; English, French and Greek</li>
     </ul>
   </description>
 
@@ -62,6 +62,9 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="1.1.95" date="2026-10-11">
+      <description><p>Add Greek localization and immediate language switching throughout the interface.</p></description>
+    </release>
     <release version="1.1.94" date="2026-10-11">
       <description>
         <p>Mouse-wheel scrolling, persistent canvas scrollbars, and reliable panel layout restoration.</p>

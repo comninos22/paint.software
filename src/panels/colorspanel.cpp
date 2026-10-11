@@ -1,4 +1,5 @@
 #include "colorspanel.h"
+#include <QSignalBlocker>
 #include "i18n.h"
 #include <QTimer>
 #include <QDockWidget>
@@ -169,6 +170,12 @@ ColorsPanel::ColorsPanel(QWidget *parent) : QWidget(parent) {
     layout->setContentsMargins(4, 2, 4, 2);
     layout->setSpacing(2);
 
+    auto translatedLabel = [this](const QString &key) {
+        auto *label = new QLabel(TR(key));
+        m_translatedLabels.append({label, key});
+        return label;
+    };
+
     // Combo Primaire/Secondaire + bouton Plus
     auto *headerLayout = new QHBoxLayout;
     headerLayout->setContentsMargins(0, 0, 0, 0);
@@ -179,7 +186,8 @@ ColorsPanel::ColorsPanel(QWidget *parent) : QWidget(parent) {
     primaryCombo->setFixedHeight(20);
     headerLayout->addWidget(primaryCombo);
     headerLayout->addStretch();
-    auto *moreBtn = new QPushButton(TR("Plus >>"));
+    m_moreBtn = new QPushButton(TR("Plus >>"));
+    auto *moreBtn = m_moreBtn;
     moreBtn->setFixedHeight(20);
     headerLayout->addWidget(moreBtn);
     layout->addLayout(headerLayout);
@@ -249,11 +257,11 @@ ColorsPanel::ColorsPanel(QWidget *parent) : QWidget(parent) {
     sliderGrid->setContentsMargins(0, 0, 0, 0);
     sliderGrid->setSpacing(1);
     // RVB header
-    auto *rvbHeader = new QLabel(TR("RVB"));
+    auto *rvbHeader = translatedLabel("RVB");
     rvbHeader->setStyleSheet("font-weight: bold; font-size: 10px; color: #555;");
     sliderGrid->addWidget(rvbHeader, 0, 0, 1, 3);
     auto makeSlider = [&](const QString &label, int row, QSlider *&slider, QSpinBox *&spin) {
-        auto *lbl = new QLabel(label);
+        auto *lbl = translatedLabel(label);
         lbl->setFixedWidth(14);
         sliderGrid->addWidget(lbl, row, 0);
         slider = new QSlider(Qt::Horizontal);
@@ -269,10 +277,10 @@ ColorsPanel::ColorsPanel(QWidget *parent) : QWidget(parent) {
         connect(slider, &QSlider::valueChanged, this, &ColorsPanel::onSlidersChanged);
     };
 
-    makeSlider(TR("R:|rgb"), 1, m_redSlider, m_redSpin);
-    makeSlider(TR("V:|vert"), 2, m_greenSlider, m_greenSpin);
-    makeSlider(TR("B:|rgb"), 3, m_blueSlider, m_blueSpin);
-    makeSlider(TR("A:|alpha"), 4, m_alphaSlider, m_alphaSpin);
+    makeSlider("R:|rgb", 1, m_redSlider, m_redSpin);
+    makeSlider("V:|vert", 2, m_greenSlider, m_greenSpin);
+    makeSlider("B:|rgb", 3, m_blueSlider, m_blueSpin);
+    makeSlider("A:|alpha", 4, m_alphaSlider, m_alphaSpin);
     m_alphaSlider->setValue(255);
     // Collapsed by default (paint.net opens with the "More >>" panel closed).
     m_slidersWidget->setVisible(false);
@@ -285,12 +293,12 @@ ColorsPanel::ColorsPanel(QWidget *parent) : QWidget(parent) {
     hsvGrid->setSpacing(1);
 
     // HSV header label
-    auto *hsvHeader = new QLabel(TR("TSV"));
+    auto *hsvHeader = translatedLabel("TSV");
     hsvHeader->setStyleSheet("font-weight: bold; font-size: 10px; color: #555;");
     hsvGrid->addWidget(hsvHeader, 0, 0, 1, 3);
 
     auto makeHsvSlider = [&](const QString &label, int row, int maxVal, QSlider *&slider, QSpinBox *&spin) {
-        auto *lbl = new QLabel(label);
+        auto *lbl = translatedLabel(label);
         lbl->setFixedWidth(14);
         hsvGrid->addWidget(lbl, row, 0);
         slider = new QSlider(Qt::Horizontal);
@@ -306,9 +314,9 @@ ColorsPanel::ColorsPanel(QWidget *parent) : QWidget(parent) {
         connect(slider, &QSlider::valueChanged, this, &ColorsPanel::onHsvSlidersChanged);
     };
 
-    makeHsvSlider(TR("T:|teinte"), 1, 360, m_hueSlider, m_hueSpin);
-    makeHsvSlider(TR("S:|saturation"), 2, 100, m_satSlider, m_satSpin);
-    makeHsvSlider(TR("V:|valeur"), 3, 100, m_valSlider, m_valSpin);
+    makeHsvSlider("T:|teinte", 1, 360, m_hueSlider, m_hueSpin);
+    makeHsvSlider("S:|saturation", 2, 100, m_satSlider, m_satSpin);
+    makeHsvSlider("V:|valeur", 3, 100, m_valSlider, m_valSpin);
     m_hsvWidget->setVisible(false);
     layout->addWidget(m_hsvWidget);
 
@@ -316,7 +324,7 @@ ColorsPanel::ColorsPanel(QWidget *parent) : QWidget(parent) {
     m_hexWidget = new QWidget;
     auto *hexLayout = new QHBoxLayout(m_hexWidget);
     hexLayout->setContentsMargins(0, 0, 0, 0);
-    hexLayout->addWidget(new QLabel(TR("Hexa :")));
+    hexLayout->addWidget(translatedLabel("Hexa :"));
     hexLayout->addWidget(m_hexEdit);
     m_hexWidget->setVisible(false);
     layout->addWidget(m_hexWidget);
@@ -660,14 +668,16 @@ void ColorsPanel::createSwatches(QBoxLayout *parentLayout) {
     paletteHeader->setContentsMargins(0, 4, 0, 0);
     paletteHeader->setSpacing(2);
 
-    auto *addBtn = new QToolButton;
+    m_addColorBtn = new QToolButton;
+    auto *addBtn = m_addColorBtn;
     addBtn->setText("+");
     addBtn->setFixedSize(20, 20);
     addBtn->setToolTip(TR("Ajouter la couleur à la palette"));
     connect(addBtn, &QToolButton::clicked, this, &ColorsPanel::addCurrentColorToPalette);
     paletteHeader->addWidget(addBtn);
 
-    auto *menuBtn = new QToolButton;
+    m_paletteBtn = new QToolButton;
+    auto *menuBtn = m_paletteBtn;
     menuBtn->setText(TR("Palette"));
     menuBtn->setFixedHeight(20);
     menuBtn->setPopupMode(QToolButton::InstantPopup);
@@ -792,4 +802,20 @@ void ColorsPanel::onSwatchClicked(const QColor &color) {
         else m_document->setSecondaryColor(color);
     }
     m_updating = false;
+}
+
+void ColorsPanel::retranslate() {
+    const QSignalBlocker blocker(m_slotCombo);
+    m_slotCombo->setItemText(0, TR("Primaire"));
+    m_slotCombo->setItemText(1, TR("Secondaire"));
+    m_moreBtn->setText(m_slidersWidget->isHidden() ? TR("Plus >>") : TR("<< Moins"));
+    m_swapBtn->setToolTip(TR("Permuter les couleurs"));
+    m_resetBtn->setToolTip(TR("Réinitialiser les couleurs par défaut"));
+    m_addColorBtn->setToolTip(TR("Ajouter la couleur à la palette"));
+    m_paletteBtn->setText(TR("Palette"));
+    const QStringList titles = {TR("Enregistrer la palette..."), TR("Charger une palette..."), TR("Réinitialiser la palette")};
+    const auto actions = m_paletteBtn->menu()->actions();
+    for (int i = 0; i < actions.size(); ++i) actions[i]->setText(titles[i]);
+    for (const auto &label : m_translatedLabels) label.first->setText(TR(label.second));
+    rebuildSwatchGrid();
 }

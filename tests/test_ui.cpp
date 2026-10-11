@@ -1,6 +1,16 @@
 // Exercise actual MainWindow startup/restart with isolated settings. Run with
 // offscreen in CTest and xcb under Xvfb to verify native palette mapping too.
 #include "mainwindow.h"
+#include "i18n.h"
+#include "canvas/canvaswidget.h"
+#include "core/document.h"
+#include "dialogs/settingsdialog.h"
+#include "dialogs/newdocumentdialog.h"
+#include "panels/colorspanel.h"
+#include <QComboBox>
+#include <QDialogButtonBox>
+#include <QMenuBar>
+#include <QPushButton>
 
 #include <QApplication>
 #include <QDockWidget>
@@ -231,6 +241,89 @@ int main(int argc, char **argv) {
         check(panel(window, "ToolsDock")->pos() != panel(window, "HistoryDock")->pos(),
               "invalid saved layout recovers distinct default positions");
         window.close();
+    }
+
+    // Switch through the real modal Settings dialog, then simulate startup.
+    {
+        I18n::setLanguage(I18n::Lang::English);
+        I18n::applyQtTranslations();
+        MainWindow window;
+        window.show();
+        settle();
+        auto *canvas = window.findChild<CanvasWidget *>();
+        check(canvas && canvas->document(), "language test has an active document");
+        Document *document = canvas->document();
+        const QImage before = document->flatten();
+        const bool modified = document->isModified();
+        const QPoint toolsPosition = panel(window, "ToolsDock")->pos();
+        QTimer::singleShot(0, [&]() {
+            auto *settings = window.findChild<SettingsDialog *>();
+            check(settings != nullptr, "open actual Settings dialog");
+            if (!settings) { if (auto *modal = QApplication::activeModalWidget()) modal->close(); return; }
+            auto *combo = settings->findChild<QComboBox *>("languageCombo");
+            const int greek = combo ? combo->findData(int(I18n::Lang::Greek)) : -1;
+            check(greek >= 0 && combo->itemText(greek) == QStringLiteral("Ελληνικά"),
+                  "Greek is discoverable by its native name");
+            if (greek >= 0) combo->setCurrentIndex(greek);
+            settle(40);
+            check(settings->windowTitle() == QStringLiteral("Ρυθμίσεις"), "open Settings dialog retranslates immediately");
+            check(panel(window, "ColorsDock")->windowTitle() == QStringLiteral("Χρώματα"),
+                  "existing panel titles change to Greek immediately");
+            auto *colors = window.findChild<ColorsPanel *>();
+            auto *colorSlots = colors->findChild<QComboBox *>();
+            check(colorSlots && colorSlots->itemText(0) == QStringLiteral("Πρωτεύον"),
+                  "existing Colors panel controls change to Greek immediately");
+            const QString screenshot = qEnvironmentVariable("PAINTSW_GREEK_SCREENSHOT");
+            if (!screenshot.isEmpty())
+                check(settings->grab().save(screenshot + ".settings.png"), "save Greek Settings screenshot");
+            settings->accept();
+        });
+        check(QMetaObject::invokeMethod(&window, "showSettingsDialog", Qt::DirectConnection), "invoke Settings language selection");
+        settle(250);
+        check(window.menuBar()->actions().first()->text() == QStringLiteral("&Αρχείο"), "main menu changes to Greek immediately");
+        check(window.menuBar()->cornerWidget(Qt::TopRightCorner)
+              && window.menuBar()->cornerWidget(Qt::TopRightCorner)->isVisible(),
+              "Settings and panel icons remain visible after changing language");
+        check(document == canvas->document() && document->flatten() == before && document->isModified() == modified,
+              "language switch preserves document pixels and modification state");
+        check(panel(window, "ToolsDock")->pos() == toolsPosition, "language switch preserves panel position");
+        QSettings settings("PaintDali", "PaintDali");
+        check(settings.value("ui/language").toString() == "el", "Greek persists with ISO language code el");
+        const QString screenshot = qEnvironmentVariable("PAINTSW_GREEK_SCREENSHOT");
+        if (!screenshot.isEmpty())
+            check(QGuiApplication::primaryScreen()->grabWindow(0).save(screenshot + ".png"), "save Greek desktop screenshot");
+        window.close();
+    }
+    {
+        I18n::setLanguage(I18n::Lang::English);
+        I18n::loadFromSettings();
+        I18n::applyQtTranslations();
+        check(I18n::language() == I18n::Lang::Greek, "Greek survives restart");
+        MainWindow window;
+        window.show();
+        settle();
+        check(panel(window, "LayersDock")->windowTitle() == QStringLiteral("Στρώσεις")
+              && panel(window, "LayersDock")->isVisible(), "Greek panels are visible after restart");
+        NewDocumentDialog dialog;
+        check(dialog.windowTitle() == QStringLiteral("Νέο"), "new document dialog opens in Greek");
+        auto *buttons = dialog.findChild<QDialogButtonBox *>();
+        check(buttons && buttons->button(QDialogButtonBox::Cancel)->text().remove('&') == QStringLiteral("Ακύρωση"),
+              "Greek standard dialog buttons survive restart");
+        window.close();
+    }
+    {
+        QSettings settings("PaintDali", "PaintDali");
+        for (const auto lang : {I18n::Lang::French, I18n::Lang::English, I18n::Lang::Greek}) {
+            I18n::setLanguage(lang);
+            I18n::saveToSettings();
+            I18n::setLanguage(I18n::Lang::English);
+            I18n::loadFromSettings();
+            check(I18n::language() == lang, "each language round-trips through settings");
+        }
+        settings.setValue("ui/language", "invalid-language");
+        I18n::loadFromSettings();
+        check(I18n::language() == I18n::Lang::English, "unknown saved language falls back to English");
+        I18n::applyQtTranslations();
     }
 
     std::printf("UI regression: %d failure(s)\n", failures);

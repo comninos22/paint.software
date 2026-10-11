@@ -107,7 +107,7 @@ LayersPanel::LayersPanel(QWidget *parent) : QWidget(parent) {
     // But we still create them to keep the signal connections
     m_blendModeCombo = new QComboBox(this);
     for (auto mode : Layer::allBlendModes())
-        m_blendModeCombo->addItem(Layer::blendModeName(mode));
+        m_blendModeCombo->addItem(TR(Layer::blendModeName(mode)));
     m_blendModeCombo->hide();
 
     m_opacitySlider = new QSlider(Qt::Horizontal, this);
@@ -497,6 +497,12 @@ void LayersPanel::syncOrderFromList() {
 }
 
 void LayersPanel::retranslate() {
+    // Updating labels must not change the active blend mode or create history.
+    const bool blocked = m_blendModeCombo->blockSignals(true);
+    const auto modes = Layer::allBlendModes();
+    for (int i = 0; i < modes.size(); ++i)
+        m_blendModeCombo->setItemText(i, TR(Layer::blendModeName(modes[i])));
+    m_blendModeCombo->blockSignals(blocked);
     m_addBtn->setToolTip(TR("Ajouter un calque"));
     m_removeBtn->setToolTip(TR("Supprimer le calque"));
     m_duplicateBtn->setToolTip(TR("Dupliquer le calque"));

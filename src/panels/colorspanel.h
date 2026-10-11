@@ -64,6 +64,7 @@ public:
     // Redraws the reset/swap icons for the current colour scheme. They are
     // painted pixmaps, so a stylesheet change cannot recolour them.
     void refreshIcons();
+    void retranslate();
 
     // Palette serialization, exposed as static helpers so they can be unit
     // tested without a file dialog. One colour per line, 8-digit AARRGGBB hex.
@@ -126,5 +127,8 @@ private:
     QWidget *m_hexWidget = nullptr;
     QWidget *m_hsvWidget = nullptr;
 
+    QPushButton *m_moreBtn = nullptr;
+    class QToolButton *m_paletteBtn = nullptr, *m_addColorBtn = nullptr;
+    QVector<QPair<QLabel *, QString>> m_translatedLabels;
     bool m_updating = false;
 };

@@ -1,7 +1,7 @@
 # AppImage
 
-Download `paint.software-1.1.94-x86_64.AppImage` from
-[the personal release](https://github.com/comninos22/paint.software/releases/tag/v1.1.94).
+Download `paint.software-1.1.95-x86_64.AppImage` from
+[the personal release](https://github.com/comninos22/paint.software/releases/tag/v1.1.95).
 Check it against the release's `SHA256SUMS`, then make it executable and launch it.
 Use `--appimage-extract-and-run` if FUSE is unavailable; no installation or root access is required.
 
@@ -11,7 +11,7 @@ remain system dependencies. It was built on Ubuntu 24.04 and smoke-tested there 
 and offscreen rendering, and on Fedora 44 with offscreen rendering and Wayland.
 These are startup tests, not exhaustive desktop, printing, GPU, or distribution compatibility tests.
 
-The application and packaging recipe are in the immutable `v1.1.94` tag.
+The application and packaging recipe are in the immutable `v1.1.95` tag.
 The release's build metadata records the exact source commit and validation results.
 Native application plugins remain disabled by default. The AppImage is not a sandbox.
 Its Qt and codecs are bundled, so update the entire AppImage when a rebuilt release is available.

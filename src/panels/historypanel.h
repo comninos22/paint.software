@@ -12,6 +12,7 @@ public:
     explicit HistoryPanel(QWidget *parent = nullptr);
 
     void setDocument(Document *doc);
+    void retranslate();
 
 public slots:
     void updateHistoryList();
@@ -21,4 +22,5 @@ private:
     bool m_navigating = false;   // guard against re-entrant history navigation
     QListWidget *m_historyList;
     QLabel *m_statusLabel;
+    class QToolButton *m_undoBtn, *m_redoBtn;
 };

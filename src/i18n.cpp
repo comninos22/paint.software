@@ -15,6 +15,21 @@ I18n::Lang g_lang = I18n::Lang::English;
 // in both languages.
 const QHash<QString, QString> &table() {
     static const QHash<QString, QString> m = {
+        {"Un éditeur d'images puissant construit avec Qt et C++.", "A powerful image editor built with Qt and C++."},
+        {"Grec", "Greek"},
+        {"pixels", "pixels"},
+        {"Configuration d'enregistrement", "Save configuration"},
+        {"Qualité :", "Quality:"},
+        {"Taille estimée : ", "Estimated size: "},
+        {"Blanc", "White"},
+        {"%1 × %2 pixels", "%1 × %2 pixels"},
+        {"OK", "OK"},
+        {"Original", "Original"},
+        {"Ouvre les paramètres : langue, thème clair ou sombre, et canevas.", "Opens Settings: language, light or dark color scheme, and canvas."},
+        {"Barre de défilement horizontale du canevas", "Horizontal canvas scroll bar"},
+        {"Barre de défilement verticale du canevas", "Vertical canvas scroll bar"},
+        {"Astuce : F5–F8 affichent/masquent les fenêtres Outils, Historique, Calques et Couleurs.", "Tip: F5–F8 show/hide the Tools, History, Layers and Colors windows."},
+
         // ---- Menu bar ----
         {"&Fichier", "&File"},
         {"É&dition", "&Edit"},
@@ -701,6 +716,15 @@ const QHash<QString, QString> &table() {
     return m;
 }
 
+const QHash<QString, QString> &greekTable() {
+    static const QHash<QString, QString> m = {
+#include "translations/greek.inc"
+    };
+    return m;
+}
+
+#include "translations/greekqt.inc"
+
 } // namespace
 
 namespace I18n {
@@ -709,27 +733,32 @@ void setLanguage(Lang lang) { g_lang = lang; }
 Lang language() { return g_lang; }
 
 void applyQtTranslations() {
-    // Qt draws the standard buttons (OK / Cancel / Yes / No / Save) from its own
-    // catalogue, which our table never sees. English is Qt's built-in default, so
-    // only French needs a catalogue loaded — and it is removed again on the way
-    // back so a switch to English takes effect without a restart.
+    // Qt's standard widgets use a separate translator. Keep an embedded Greek
+    // fallback because the SDK does not ship qtbase_el.qm. A system catalogue,
+    // when available, is installed last and takes precedence over the fallback.
     static QTranslator *qtTranslator = nullptr;
-    if (qtTranslator) {
-        QCoreApplication::removeTranslator(qtTranslator);
-        delete qtTranslator;
-        qtTranslator = nullptr;
+    static GreekQtTranslator *greekTranslator = nullptr;
+    for (QTranslator *translator : {qtTranslator, static_cast<QTranslator *>(greekTranslator)}) {
+        if (translator) {
+            QCoreApplication::removeTranslator(translator);
+            delete translator;
+        }
     }
-    if (g_lang != Lang::French) return;
-
-    auto *t = new QTranslator;
-    // qtbase_fr.qm ships in a separate package; if it is missing, Qt simply keeps
-    // its English strings rather than failing.
-    if (t->load(QStringLiteral("qtbase_fr"),
-                QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
-        QCoreApplication::installTranslator(t);
-        qtTranslator = t;
+    qtTranslator = nullptr;
+    greekTranslator = nullptr;
+    if (g_lang == Lang::English) return;
+    if (g_lang == Lang::Greek) {
+        greekTranslator = new GreekQtTranslator;
+        QCoreApplication::installTranslator(greekTranslator);
+    }
+    auto *translator = new QTranslator;
+    const QString catalog = g_lang == Lang::Greek ? QStringLiteral("qtbase_el")
+                                                  : QStringLiteral("qtbase_fr");
+    if (translator->load(catalog, QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
+        QCoreApplication::installTranslator(translator);
+        qtTranslator = translator;
     } else {
-        delete t;
+        delete translator;
     }
 }
 
@@ -739,12 +768,12 @@ void loadFromSettings() {
     // choice should land on the more widely understood language. Picking a
     // language in Settings writes the key, and that choice then wins forever.
     const QString v = s.value("ui/language", "en").toString();
-    g_lang = (v == "fr") ? Lang::French : Lang::English;
+    g_lang = v == "el" ? Lang::Greek : v == "fr" ? Lang::French : Lang::English;
 }
 
 void saveToSettings() {
     QSettings s("PaintDali", "PaintDali");
-    s.setValue("ui/language", g_lang == Lang::English ? "en" : "fr");
+    s.setValue("ui/language", g_lang == Lang::Greek ? "el" : g_lang == Lang::French ? "fr" : "en");
 }
 
 QString t(const QString &french) {
@@ -755,8 +784,9 @@ QString t(const QString &french) {
     const int bar = french.indexOf(QLatin1Char('|'));
     const QString plain = (bar < 0) ? french : french.left(bar);
     if (g_lang == Lang::French) return plain;
-    auto it = table().constFind(french);
-    return (it != table().constEnd()) ? it.value() : plain;
+    const auto &translations = g_lang == Lang::Greek ? greekTable() : table();
+    auto it = translations.constFind(french);
+    return (it != translations.constEnd()) ? it.value() : plain;
 }
 
 } // namespace I18n

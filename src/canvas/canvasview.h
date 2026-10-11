@@ -9,6 +9,7 @@ class QScrollBar;
 class CanvasView : public QWidget {
 public:
     explicit CanvasView(QWidget *parent = nullptr);
+    void retranslate();
     CanvasWidget *canvas() const { return m_canvas; }
     QScrollBar *horizontalScrollBar() const { return m_horizontal; }
     QScrollBar *verticalScrollBar() const { return m_vertical; }

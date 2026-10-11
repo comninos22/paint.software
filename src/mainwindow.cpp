@@ -813,13 +813,25 @@ void MainWindow::retranslateUi() {
     }
     if (m_toolOptionsPanel) m_toolOptionsPanel->retranslate();
     if (m_layersPanel) m_layersPanel->retranslate();
+    if (m_colorsPanel) m_colorsPanel->retranslate();
+    if (m_historyPanel) m_historyPanel->retranslate();
+    if (auto *view = dynamic_cast<CanvasView *>(centralWidget())) view->retranslate();
 
-    if (m_toolsDock)   m_toolsDock->setWindowTitle(TR("Outils"));
+    if (m_toolsDock) {
+        m_toolsDock->setWindowTitle(TR("Outils"));
+        const auto area = dockWidgetArea(m_toolsDock);
+        layoutToolsPalette(!m_toolsDock->isFloating()
+                           && (area == Qt::TopDockWidgetArea || area == Qt::BottomDockWidgetArea));
+    }
     if (m_historyDock) m_historyDock->setWindowTitle(TR("Historique"));
     if (m_layersDock)  m_layersDock->setWindowTitle(TR("Calques"));
     if (m_colorsDock)  m_colorsDock->setWindowTitle(TR("Couleurs"));
 
     rebuildToolsPaletteTooltips();
+    for (auto *button : statusBar()->findChildren<QToolButton *>()) {
+        const QString key = button->property("translationKey").toString();
+        if (!key.isEmpty()) button->setToolTip(TR(key));
+    }
 
     // Re-running tool selection refreshes the status-bar name and help text.
     if (m_currentTool) selectTool(m_currentTool->type());
@@ -910,7 +922,7 @@ void MainWindow::createMenuBarCornerIcons() {
     settingsBtn->setAutoRaise(true);
     settingsBtn->setToolTip(QString("<b>%1</b><br>%2")
         .arg(TR("Paramètres"),
-             TR("Ouvre les paramètres : langue (français / anglais), thème clair ou sombre, et canevas.")));
+             TR("Ouvre les paramètres : langue, thème clair ou sombre, et canevas.")));
     connect(settingsBtn, &QToolButton::clicked, this, &MainWindow::showSettingsDialog);
     cornerLayout->addWidget(settingsBtn);
 
@@ -930,12 +942,14 @@ void MainWindow::createMenuBarCornerIcons() {
         QMessageBox::about(this, TR("À propos de paint.software"),
             "<h2>paint.software</h2>"
             "<p>" + TR("Version") + " " PAINTSW_VERSION_STR " — " + TR("édition Linux") + "</p>"
-            "<p>Un éditeur d'images puissant construit avec Qt et C++.</p>");
+            "<p>" + TR("Un éditeur d'images puissant construit avec Qt et C++.") + "</p>");
     });
     helpBtn->setMenu(helpMenu);
     cornerLayout->addWidget(helpBtn);
 
     menuBar()->setCornerWidget(corner, Qt::TopRightCorner);
+    // Widgets added to an already visible menu bar must be shown explicitly.
+    corner->show();
 }
 
 void MainWindow::resetUtilityWindow(QDockWidget *dock, bool show) {
@@ -1512,7 +1526,9 @@ void MainWindow::layoutToolsPalette(bool horizontal) {
         m_toolsGrid->setContentsMargins(1, 2, 1, 2);
         m_toolsPaletteWidget->setMinimumHeight(0);
         m_toolsPaletteWidget->setMaximumHeight(QWIDGETSIZE_MAX);
-        m_toolsPaletteWidget->setMinimumWidth(28 * 2 + 2);
+        // Leave room for translated titles alongside the dock title buttons.
+        m_toolsPaletteWidget->setMinimumWidth(qMax(28 * 2 + 2,
+            fontMetrics().horizontalAdvance(TR("Outils")) + 48));
         m_toolsPaletteWidget->setMaximumWidth(200);
         if (m_toolsDock) m_toolsDock->setMinimumSize(0, 0);
         m_toolsGrid->setColumnStretch(0, 1);
@@ -1589,7 +1605,7 @@ void MainWindow::createDockPanels() {
 
 void MainWindow::createStatusBar() {
     // Active tool name on the far left.
-    m_toolLabel = new QLabel("Pinceau");
+    m_toolLabel = new QLabel(TR("Pinceau"));
     m_toolLabel->setStyleSheet("font-size: 11px; font-weight: bold; padding-left: 4px; padding-right: 6px;");
     statusBar()->addWidget(m_toolLabel);
 
@@ -1646,6 +1662,7 @@ void MainWindow::createStatusBar() {
     zoomOutBtn->setText("-");
     zoomOutBtn->setFixedSize(18, 16);
     zoomOutBtn->setToolTip(TR("Zoom arrière"));
+    zoomOutBtn->setProperty("translationKey", "Zoom arrière");
 
     auto *zoomSlider = new QSlider(Qt::Horizontal);
     zoomSlider->setFixedWidth(92);
@@ -1655,6 +1672,7 @@ void MainWindow::createStatusBar() {
     zoomInBtn->setText("+");
     zoomInBtn->setFixedSize(18, 16);
     zoomInBtn->setToolTip(TR("Zoom avant"));
+    zoomInBtn->setProperty("translationKey", "Zoom avant");
 
     static const int zoomSteps[] = {
         1, 2, 3, 5, 8, 12, 16, 25, 33, 50, 66, 75,

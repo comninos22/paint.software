@@ -35,7 +35,7 @@ LayerPropertiesDialog::LayerPropertiesDialog(Layer *layer, QWidget *parent)
 
     m_blendModeCombo = new QComboBox;
     for (auto mode : Layer::allBlendModes())
-        m_blendModeCombo->addItem(Layer::blendModeName(mode));
+        m_blendModeCombo->addItem(TR(Layer::blendModeName(mode)));
     m_blendModeCombo->setCurrentIndex(static_cast<int>(layer->blendMode()));
     blendLayout->addWidget(m_blendModeCombo);
 

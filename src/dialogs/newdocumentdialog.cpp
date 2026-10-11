@@ -10,8 +10,8 @@
 #include <QColorDialog>
 
 NewDocumentDialog::NewDocumentDialog(QWidget *parent) : QDialog(parent) {
-    setWindowTitle("Nouveau");
-    setFixedWidth(360);
+    setWindowTitle(TR("Nouveau"));
+    setMinimumWidth(400);
     m_ratio = 800.0 / 600.0;
     auto *layout = new QVBoxLayout(this);
     layout->setSpacing(8);
@@ -42,14 +42,14 @@ NewDocumentDialog::NewDocumentDialog(QWidget *parent) : QDialog(parent) {
     m_widthSpin->setRange(1, 65535);
     m_widthSpin->setValue(800);
     sizeGrid->addWidget(m_widthSpin, 0, 1);
-    sizeGrid->addWidget(new QLabel("pixels"), 0, 2);
+    sizeGrid->addWidget(new QLabel(TR("pixels")), 0, 2);
 
     sizeGrid->addWidget(new QLabel(TR("Hauteur :")), 1, 0);
     m_heightSpin = new QSpinBox;
     m_heightSpin->setRange(1, 65535);
     m_heightSpin->setValue(600);
     sizeGrid->addWidget(m_heightSpin, 1, 1);
-    sizeGrid->addWidget(new QLabel("pixels"), 1, 2);
+    sizeGrid->addWidget(new QLabel(TR("pixels")), 1, 2);
 
     sizeGrid->addWidget(new QLabel(TR("Résolution :")), 2, 0);
     m_resolutionSpin = new QSpinBox;
@@ -70,7 +70,7 @@ NewDocumentDialog::NewDocumentDialog(QWidget *parent) : QDialog(parent) {
     m_colorBtn->setFixedSize(80, 24);
     m_colorBtn->setStyleSheet("background-color: white; border: 1px solid #aaa;");
     bgLayout->addWidget(m_colorBtn);
-    auto *colorLabel = new QLabel("Blanc");
+    auto *colorLabel = new QLabel(TR("Blanc"));
     bgLayout->addWidget(colorLabel);
     bgLayout->addStretch();
     layout->addLayout(bgLayout);
@@ -78,7 +78,7 @@ NewDocumentDialog::NewDocumentDialog(QWidget *parent) : QDialog(parent) {
     // Infos taille
     m_sizeInfoLabel = new QLabel;
     m_sizeInfoLabel->setStyleSheet("color: #555; font-size: 11px;");
-    m_sizeInfoLabel->setText(QString("%1 \u00d7 %2 pixels").arg(800).arg(600));
+    m_sizeInfoLabel->setText(TR("%1 × %2 pixels").arg(800).arg(600));
     layout->addWidget(m_sizeInfoLabel);
 
     // OK / Annuler
@@ -110,7 +110,7 @@ void NewDocumentDialog::onPresetChanged(int index) {
         m_widthSpin->setValue(presets[index][0]);
         m_heightSpin->setValue(presets[index][1]);
         m_ratio = (double)presets[index][0] / presets[index][1];
-        m_sizeInfoLabel->setText(QString("%1 \u00d7 %2 pixels").arg(presets[index][0]).arg(presets[index][1]));
+        m_sizeInfoLabel->setText(TR("%1 × %2 pixels").arg(presets[index][0]).arg(presets[index][1]));
         m_updating = false;
     }
 }
@@ -128,7 +128,7 @@ void NewDocumentDialog::onWidthChanged(int value) {
     m_updating = true;
     if (m_aspectRatio->isChecked())
         m_heightSpin->setValue(static_cast<int>(value / m_ratio));
-    m_sizeInfoLabel->setText(QString("%1 \u00d7 %2 pixels").arg(m_widthSpin->value()).arg(m_heightSpin->value()));
+    m_sizeInfoLabel->setText(TR("%1 × %2 pixels").arg(m_widthSpin->value()).arg(m_heightSpin->value()));
     m_presetCombo->setCurrentIndex(0);
     m_updating = false;
 }
@@ -138,7 +138,7 @@ void NewDocumentDialog::onHeightChanged(int value) {
     m_updating = true;
     if (m_aspectRatio->isChecked())
         m_widthSpin->setValue(static_cast<int>(value * m_ratio));
-    m_sizeInfoLabel->setText(QString("%1 \u00d7 %2 pixels").arg(m_widthSpin->value()).arg(m_heightSpin->value()));
+    m_sizeInfoLabel->setText(TR("%1 × %2 pixels").arg(m_widthSpin->value()).arg(m_heightSpin->value()));
     m_presetCombo->setCurrentIndex(0);
     m_updating = false;
 }

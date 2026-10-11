@@ -135,7 +135,7 @@ private:
 
 // ---- Dialog ----
 CurvesDialog::CurvesDialog(QWidget *parent) : QDialog(parent) {
-    setWindowTitle("Courbes");
+    setWindowTitle(TR("Courbes"));
     auto *layout = new QVBoxLayout(this);
     layout->addWidget(new QLabel(TR("Glissez les points. Clic pour ajouter, clic droit pour supprimer.")));
 
@@ -150,10 +150,10 @@ CurvesDialog::CurvesDialog(QWidget *parent) : QDialog(parent) {
     auto *btnRow = new QHBoxLayout;
     auto *resetBtn = new QPushButton(TR("Réinitialiser"));
     connect(resetBtn, &QPushButton::clicked, m_curve, [this]() { m_curve->reset(); });
-    auto *okBtn = new QPushButton("OK");
+    auto *okBtn = new QPushButton(TR("OK"));
     okBtn->setDefault(true);
     connect(okBtn, &QPushButton::clicked, this, &QDialog::accept);
-    auto *cancelBtn = new QPushButton("Annuler");
+    auto *cancelBtn = new QPushButton(TR("Annuler|bouton"));
     connect(cancelBtn, &QPushButton::clicked, this, &QDialog::reject);
     btnRow->addWidget(resetBtn);
     btnRow->addStretch();

@@ -3,10 +3,10 @@
 #include <QString>
 
 // Lightweight UI translation layer. The source strings are French (the language
-// the UI was written in); English is provided through a lookup table.
+// the UI was written in); English and Greek use compiled lookup tables.
 namespace I18n {
 
-enum class Lang { French, English };
+enum class Lang { French, English, Greek };
 
 void setLanguage(Lang lang);
 Lang language();
@@ -17,7 +17,7 @@ void saveToSettings();
 
 // Loads Qt's own translations for the current language. Qt renders the standard
 // dialog buttons (OK / Cancel / Yes / No / Save) itself, so without this they
-// stay English inside an otherwise French UI. Call after setLanguage().
+// use the selected language. Call after setLanguage().
 void applyQtTranslations();
 
 // Translate a French UI string. Returns it unchanged when the language is

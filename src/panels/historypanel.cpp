@@ -28,12 +28,14 @@ HistoryPanel::HistoryPanel(QWidget *parent) : QWidget(parent) {
         " border: 1px solid palette(mid); border-radius: 4px; }"
         "QToolButton:hover { background: rgba(74,132,224,0.18); border-color: #4a84e0; }"
         "QToolButton:pressed { background: rgba(74,132,224,0.35); }";
-    auto *undoBtn = new QToolButton;
+    m_undoBtn = new QToolButton;
+    auto *undoBtn = m_undoBtn;
     undoBtn->setText(QString::fromUtf8("↶"));
     undoBtn->setFixedSize(30, 26);
     undoBtn->setStyleSheet(btnStyle);
     undoBtn->setToolTip(TR("Annuler (Ctrl+Z)"));
-    auto *redoBtn = new QToolButton;
+    m_redoBtn = new QToolButton;
+    auto *redoBtn = m_redoBtn;
     redoBtn->setText(QString::fromUtf8("↷"));
     redoBtn->setFixedSize(30, 26);
     redoBtn->setStyleSheet(btnStyle);
@@ -74,13 +76,13 @@ void HistoryPanel::updateHistoryList() {
     if (!m_document) return;
     m_historyList->clear();
 
-    auto *original = new QListWidgetItem("▶ Original");
+    auto *original = new QListWidgetItem("▶ " + TR("Original"));
     m_historyList->addItem(original);
 
     // Full timeline (done + still-redoable), so past AND future steps are shown.
     QStringList history = m_document->history().fullHistoryList();
     for (const QString &item : history) {
-        m_historyList->addItem("▶ " + item);
+        m_historyList->addItem("▶ " + TR(item));
     }
 
     int currentIdx = m_document->history().currentIndex();
@@ -95,4 +97,10 @@ void HistoryPanel::updateHistoryList() {
             item->setForeground(QColor(140, 140, 140));   // readable on light AND dark
         // else: inherit the stylesheet/theme text colour
     }
+}
+
+void HistoryPanel::retranslate() {
+    m_undoBtn->setToolTip(TR("Annuler (Ctrl+Z)"));
+    m_redoBtn->setToolTip(TR("Rétablir (Ctrl+Y)"));
+    updateHistoryList();
 }

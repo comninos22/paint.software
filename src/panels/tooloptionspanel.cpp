@@ -215,7 +215,7 @@ ToolOptionsPanel::ToolOptionsPanel(QWidget *parent) : QWidget(parent) {
     layout->addWidget(m_blendModeLabel);
     m_blendModeCombo = new QComboBox;
     for (auto mode : Layer::allBlendModes())
-        m_blendModeCombo->addItem(Layer::blendModeName(mode));
+        m_blendModeCombo->addItem(TR(Layer::blendModeName(mode)));
     m_blendModeCombo->setFixedHeight(20);
     m_blendModeCombo->setFixedWidth(100);
     layout->addWidget(m_blendModeCombo);
@@ -755,6 +755,12 @@ void ToolOptionsPanel::onTextStyleChanged() {
 }
 
 void ToolOptionsPanel::retranslate() {
+    // Updating labels must not change the active blend mode or create history.
+    const bool blocked = m_blendModeCombo->blockSignals(true);
+    const auto modes = Layer::allBlendModes();
+    for (int i = 0; i < modes.size(); ++i)
+        m_blendModeCombo->setItemText(i, TR(Layer::blendModeName(modes[i])));
+    m_blendModeCombo->blockSignals(blocked);
     m_brushSizeLabel->setText(TR("Largeur :"));
     m_hardnessLabel->setText(TR("Dureté :"));
     m_spacingLabel->setText(TR("Espacement :"));
@@ -763,6 +769,10 @@ void ToolOptionsPanel::retranslate() {
     m_fillLabel->setText(TR("Remplissage :"));
     m_fillStyleLabel->setText(TR("Style de remplissage :"));
     m_fillStyleCombo->setToolTip(TR("Motif de remplissage"));
+    const bool fillBlocked = m_fillStyleCombo->blockSignals(true);
+    for (int i = 0; i < Hatch::count(); ++i)
+        m_fillStyleCombo->setItemText(i, TR(Hatch::name(i)));
+    m_fillStyleCombo->blockSignals(fillBlocked);
     m_cornerLabel->setText(TR("Coin :"));
     m_blendModeLabel->setText(TR("Mode :"));
     m_samplingLabel->setText(TR("Échantillonnage :"));

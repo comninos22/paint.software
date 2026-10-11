@@ -53,6 +53,7 @@
 #include "dialogs/saveconfigdialog.h"
 #include <QPushButton>
 #include <QComboBox>
+#include <QDialogButtonBox>
 #include <QLineEdit>
 #include <QDoubleSpinBox>
 #include <QDockWidget>
@@ -743,6 +744,30 @@ int main(int argc, char **argv) {
         CHECK(I18n::t("Pinceau") == "Paintbrush", "English translates Paintbrush");
         CHECK(I18n::t("Sombre") == "Dark", "English translates Dark");
         CHECK(I18n::t("ZZ-unknown-ZZ") == "ZZ-unknown-ZZ", "Unknown string passes through");
+        I18n::setLanguage(I18n::Lang::Greek);
+        CHECK(TR("&Fichier") == QStringLiteral("&Αρχείο"), "Greek translates File menu");
+        CHECK(TR("Pinceau") == QStringLiteral("Πινέλο"), "Greek translates Paintbrush");
+        CHECK(TR("Annuler") == QStringLiteral("Αναίρεση")
+              && TR("Annuler|bouton") == QStringLiteral("Ακύρωση"), "Greek distinguishes undo from cancel");
+        CHECK(TR("unknown|context") == "unknown", "Greek fallback hides context suffix");
+        CHECK(TR("Nouvelle taille : %1 x %2 pixels").arg(800).arg(600)
+              == QStringLiteral("Νέο μέγεθος: 800 x 600 εικονοστοιχεία"), "Greek keeps substitution placeholders");
+        CHECK(TR("Solid Color") == QStringLiteral("Ενιαίο χρώμα"), "Greek translates fill patterns");
+        CHECK(TR("Multiply") == QStringLiteral("Πολλαπλασιασμός"), "Greek translates blend modes");
+        I18n::applyQtTranslations();
+        QDialogButtonBox buttons(QDialogButtonBox::Ok | QDialogButtonBox::Cancel | QDialogButtonBox::Save);
+        CHECK(buttons.button(QDialogButtonBox::Cancel)->text().remove('&') == QStringLiteral("Ακύρωση"),
+              "Greek standard buttons work without an external Qt catalog");
+        CHECK(buttons.button(QDialogButtonBox::Save)->text().remove('&') == QStringLiteral("Αποθήκευση"),
+              "Greek standard Save button is translated");
+        CHECK(QCoreApplication::translate("QFileDialog", "File &name:") == QStringLiteral("Ό&νομα αρχείου:"),
+              "Greek Qt file dialog labels are translated");
+        CHECK(QCoreApplication::translate("UnrelatedPlugin", "Cancel") == "Cancel",
+              "Qt fallback does not translate unrelated plugin contexts");
+        I18n::setLanguage(I18n::Lang::English);
+        I18n::applyQtTranslations();
+        CHECK(QCoreApplication::translate("QPlatformTheme", "Cancel") == "Cancel",
+              "Switching to English removes Greek Qt translations");
         I18n::setLanguage(I18n::Lang::French);
     }
 
@@ -1517,6 +1542,8 @@ int main(int argc, char **argv) {
 
         const QString frClash = collisionFor(I18n::Lang::French);
         const QString enClash = collisionFor(I18n::Lang::English);
+        const QString elClash = collisionFor(I18n::Lang::Greek);
+        CHECK(elClash.isEmpty(), "no duplicate menu accelerators in Greek");
         CHECK(frClash.isEmpty(), "no duplicate menu accelerators in French");
         CHECK(enClash.isEmpty(), "no duplicate menu accelerators in English");
         if (!frClash.isEmpty()) printf("    (fr: %s)\n", qPrintable(frClash));

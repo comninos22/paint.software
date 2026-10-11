@@ -13,6 +13,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QSettings>
+#include <QSignalBlocker>
 
 SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     setWindowTitle(TR("Paramètres"));
@@ -23,7 +24,8 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
 
     // ---- Category list (left) ----
     m_categories = new QListWidget;
-    m_categories->setFixedWidth(160);
+    m_categories->setMinimumWidth(180);
+    m_categories->setMaximumWidth(230);
     m_categories->addItem(TR("Interface utilisateur"));
     m_categories->addItem(TR("Canevas"));
     m_categories->addItem(TR("Outils"));
@@ -35,9 +37,9 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     m_pages->addWidget(buildUserInterfacePage());
     m_pages->addWidget(buildCanvasPage());
     m_pages->addWidget(buildPlaceholderPage(
-        TR("Largeur du pinceau ( [ et ] pour ajuster )")));
+        "Largeur du pinceau ( [ et ] pour ajuster )"));
     m_pages->addWidget(buildPlaceholderPage(
-        TR("Astuce : F5–F8 affichent/masquent les fenêtres Outils, Historique, ")));
+        "Astuce : F5–F8 affichent/masquent les fenêtres Outils, Historique, Calques et Couleurs."));
     body->addWidget(m_pages, 1);
 
     connect(m_categories, &QListWidget::currentRowChanged,
@@ -49,7 +51,8 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
     // ---- Close button ----
     auto *btnRow = new QHBoxLayout;
     btnRow->addStretch();
-    auto *closeBtn = new QPushButton(TR("Fermer"));
+    m_closeBtn = new QPushButton(TR("Fermer"));
+    auto *closeBtn = m_closeBtn;
     closeBtn->setDefault(true);
     connect(closeBtn, &QPushButton::clicked, this, &QDialog::accept);
     btnRow->addWidget(closeBtn);
@@ -73,24 +76,30 @@ QWidget *SettingsDialog::buildUserInterfacePage() {
         Theme::saveToSettings();
         emit colorSchemeChanged();
     });
-    form->addRow(TR("Thème :"), m_schemeCombo);
+    m_schemeLabel = new QLabel(TR("Thème :"));
+    form->addRow(m_schemeLabel, m_schemeCombo);
 
-    // Language: French / English, applied immediately.
+    // Language choices use native names so users can always find their language.
     m_languageCombo = new QComboBox;
-    m_languageCombo->addItem(TR("Français"), int(I18n::Lang::French));
-    m_languageCombo->addItem(TR("Anglais"),  int(I18n::Lang::English));
-    m_languageCombo->setCurrentIndex(int(I18n::language()));
+    m_languageCombo->setObjectName("languageCombo");
+    m_languageCombo->addItem(QStringLiteral("Français"), int(I18n::Lang::French));
+    m_languageCombo->addItem(QStringLiteral("English"), int(I18n::Lang::English));
+    m_languageCombo->addItem(QStringLiteral("Ελληνικά"), int(I18n::Lang::Greek));
+    m_languageCombo->setCurrentIndex(m_languageCombo->findData(int(I18n::language())));
     connect(m_languageCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int i) {
         I18n::setLanguage(static_cast<I18n::Lang>(m_languageCombo->itemData(i).toInt()));
         I18n::saveToSettings();
         I18n::applyQtTranslations();
+        retranslate();
         emit languageChanged();
     });
-    form->addRow(TR("Langue :"), m_languageCombo);
+    m_languageLabel = new QLabel(TR("Langue :"));
+    form->addRow(m_languageLabel, m_languageCombo);
 
     layout->addLayout(form);
 
-    auto *note = new QLabel(TR("Le changement de langue est appliqué immédiatement."));
+    m_note = new QLabel(TR("Le changement de langue est appliqué immédiatement."));
+    auto *note = m_note;
     note->setStyleSheet("color: #4a90d9;");
     note->setWordWrap(true);
     layout->addWidget(note);
@@ -105,7 +114,9 @@ QWidget *SettingsDialog::buildCanvasPage() {
 
     QSettings s("PaintDali", "PaintDali");
 
-    auto *label = new QLabel(TR("Luminosité du damier de transparence :"));
+    m_checkerLabel = new QLabel(TR("Luminosité du damier de transparence :"));
+    auto *label = m_checkerLabel;
+    label->setWordWrap(true);
     layout->addWidget(label);
 
     m_checkerSlider = new QSlider(Qt::Horizontal);
@@ -125,10 +136,30 @@ QWidget *SettingsDialog::buildCanvasPage() {
 QWidget *SettingsDialog::buildPlaceholderPage(const QString &text) {
     auto *page = new QWidget;
     auto *layout = new QVBoxLayout(page);
-    auto *label = new QLabel(text);
+    auto *label = new QLabel(TR(text));
+    label->setProperty("translationKey", text);
     label->setWordWrap(true);
     label->setAlignment(Qt::AlignTop);
     layout->addWidget(label);
     layout->addStretch();
     return page;
+}
+
+void SettingsDialog::retranslate() {
+    setWindowTitle(TR("Paramètres"));
+    const QStringList categories = {TR("Interface utilisateur"), TR("Canevas"), TR("Outils"), TR("Aide")};
+    for (int i = 0; i < categories.size(); ++i) m_categories->item(i)->setText(categories[i]);
+    m_closeBtn->setText(TR("Fermer"));
+    m_languageLabel->setText(TR("Langue :"));
+    m_schemeLabel->setText(TR("Thème :"));
+    m_note->setText(TR("Le changement de langue est appliqué immédiatement."));
+    m_checkerLabel->setText(TR("Luminosité du damier de transparence :"));
+    const QSignalBlocker blocker(m_schemeCombo);
+    m_schemeCombo->setItemText(0, TR("Défaut (système)"));
+    m_schemeCombo->setItemText(1, TR("Clair"));
+    m_schemeCombo->setItemText(2, TR("Sombre"));
+    for (QLabel *label : m_pages->findChildren<QLabel *>()) {
+        const QString key = label->property("translationKey").toString();
+        if (!key.isEmpty()) label->setText(TR(key));
+    }
 }
