@@ -10,16 +10,25 @@ See [the security review](docs/security-review.md) for findings, tests, and limi
 ## Download
 
 Use only [this fork's releases](https://github.com/comninos22/paint.software/releases) to obtain these changes.
-The initial release provides source and an amd64 `.deb` built on Ubuntu 24.04, with SHA-256 checksums.
+The release provides an x86-64 AppImage, source, and an amd64 `.deb` built on Ubuntu 24.04, with SHA-256 checksums.
+The AppImage bundles Qt 6.12.0 and runs on modern Linux desktops; it was smoke-tested on Ubuntu 24.04
+and Fedora 44 (including Wayland). See [AppImage requirements and packaging](packaging/APPIMAGE.md).
+Replace the AppImage with an updated release to update its bundled libraries.
 The `.deb` uses distribution Qt libraries; keep the operating system and image codecs updated.
-Other distributions, including Fedora, can build from source below.
+
+```sh
+chmod +x paint.software-1.1.93-security.1-x86_64.AppImage
+./paint.software-1.1.93-security.1-x86_64.AppImage
+# If FUSE is unavailable:
+./paint.software-1.1.93-security.1-x86_64.AppImage --appimage-extract-and-run
+```
 
 ```sh
 sha256sum -c SHA256SUMS
 sudo apt install ./paint.software_1.1.93_amd64.deb
 ```
 
-There is no APT repository, bundled AppImage, or Flatpak release for this fork. The package uses the
+There is no APT repository or Flatpak release for this fork. The Debian package uses the
 same `paintdotnet` executable and package name as upstream and replaces an installed upstream package.
 Checksums detect corruption; they are not an independent publisher signature.
 

@@ -20,7 +20,7 @@ Previously published upstream binaries were not downloaded or verified against s
 | Native `.psw` dimensions and aggregate layer memory are not bounded; QString lengths are deserialized before validation | Crafted-file resource exhaustion risk; the original limit of 4,096 layers is not a practical memory budget | Validate encoded file size, dimensions, pixel budget, layer count and name length before allocation; check embedded PNG headers |
 | Native format version, active index, enum, opacity, offsets and layer/canvas consistency are insufficiently validated | Confirmed acceptance of invalid metadata and signed-integer overflow during rendering with a small crafted file; arbitrary code execution has not been established | Reject unsupported versions, invalid indices/booleans/blends, NaN/infinity, excessive offsets, mismatched dimensions, truncation and trailing data; preserve the current document on rejection |
 | AppImage workflow selects Qt 6.5.3 and qtimageformats | Qt 6.5.3 is within the affected versions of the published ICNS crash vulnerability CVE-2025-5683; this is a dependency finding, not evidence of intent | Retire this AppImage pipeline; ship a distribution-linked `.deb`, and restrict Open/Import to the advertised raster formats |
-| AppImage tools are downloaded from mutable `continuous` URLs without integrity pins; aqtinstall and Actions use mutable references | Build supply-chain exposure, with no compromise demonstrated | Remove external AppImage downloads; pin remaining Actions to exact commits; use distribution package repositories |
+| AppImage tools are downloaded from mutable `continuous` URLs without integrity pins; aqtinstall and Actions use mutable references | Build supply-chain exposure, with no compromise demonstrated | Retire the inherited pipeline; pin remaining Actions to exact commits; see the later AppImage addendum below |
 | APT publishing falls back to unsigned metadata and recommends `trusted=yes` if signing secrets are absent | Integrity bypass by design in the fallback configuration; upstream's live APT deployment was not tested | Remove APT deployment and unsigned install instructions from active fork documentation |
 | Flatpak manifest fetches upstream `main` independently of the checked-out revision, using an old runtime and broad home access | Release provenance mismatch and unnecessary file access; a fork build could omit its own changes | Retire inherited Flatpak workflow/manifests; the supported release builds the reviewed local source |
 | Native plugins are automatically loaded at startup | Documented arbitrary native-code execution by design, not by itself a vulnerability | Disable startup loading unless `PAINTSW_ENABLE_PLUGINS=1`; document the trust boundary |
@@ -69,3 +69,17 @@ symlinks or submodules were present. Workflow YAML and packaging shell syntax we
 - Explicitly enabled plugins retain full account access and can crash or compromise the process. They are not sandboxed.
 - Retired upstream distribution instructions are preserved only in `docs/README.upstream.md` as historical context.
 - Source history and the original MIT copyright notice are retained. This fork does not imply upstream endorsement.
+
+## AppImage addition, 2026-10-11
+
+An x86-64 AppImage was subsequently added to the same release at the user's request. The application
+source remains tag `v1.1.93-security.1` (`e07dfa988bb143282717985c23df758a2e47deb6`); the new packaging
+recipe is on `main`. This replaces the retired inherited AppImage workflow with a manual recipe using
+Qt 6.12.0, SHA-256-pinned SDK/tool downloads, and an explicitly pinned runtime. No workflow publishes it.
+
+All three regression suites passed against Qt 6.12.0. The final AppImage passed Ubuntu 24.04 X11
+and Fedora 44 offscreen/FUSE/extraction/Wayland startup tests; loader traces confirmed that Qt came
+from the AppImage. Unused ICNS/ICO/TGA/WBMP plugins and the optional SVG-dependent Adwaita decoration
+are omitted. Bundled library updates require rebuilding and replacing the AppImage; operating-system
+updates alone do not update them. The dependency sources, notices, versions and checksums accompany
+the release. This addition does not constitute a complete audit of Qt or other bundled dependencies.

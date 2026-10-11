@@ -1,0 +1,30 @@
+paint.software personal fork: https://github.com/comninos22/paint.software
+Application license: MIT; see LICENSE in this directory.
+
+This AppImage dynamically links Qt 6.12.0 (Core, Gui, Widgets, PrintSupport,
+DBus, XcbQpa, WaylandClient, image-format plugins and translations). These
+Qt modules are used under LGPL-3.0; license texts, third-party notices and
+the original Qt SBOMs accompany this file. ICU 73.2 is also bundled.
+Ubuntu runtime-library copyright notices are in adjacent /usr/share/doc
+directories. Referenced common licenses are included under common-licenses.
+The Qt SBOMs describe the full SDK modules; some SDK components are omitted.
+
+Corresponding source for the Qt modules and Ubuntu libraries is provided
+as the AppImage-dependency-sources.tar asset beside this AppImage on the
+v1.1.93-security.1 GitHub release. The source manifests give exact upstream
+URLs, versions, and checksums. Qt source is also available from:
+https://download.qt.io/official_releases/qt/6.12/6.12.0/submodules/
+ICU source: https://github.com/unicode-org/icu/tree/release-73-2
+AppImage runtime source and build instructions:
+https://github.com/AppImage/type2-runtime/tree/8f39b89e2ac31e1640b3d3f7e9a5108e6ce805fa
+The runtime's --appimage-help option lists its component licenses.
+
+You may extract this image with --appimage-extract, replace compatible
+shared libraries under squashfs-root/usr/lib and plugins under usr/plugins,
+and run squashfs-root/AppRun. No signature or technical lock prevents this.
+The MIT application license imposes no restriction on modification or
+reverse engineering for debugging modifications to LGPL libraries.
+
+The AppImage bundles libraries and must be replaced with a rebuilt release
+to obtain their updates. It is not a sandbox. Native application plugins
+remain disabled by default; Qt platform and image-format plugins are distinct.

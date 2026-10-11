@@ -8,6 +8,7 @@ Report suspected vulnerabilities through this fork's
 Do not include secrets or weaponized exploit payloads in public issues. If private reporting is unavailable,
 use a minimal public request for a private contact method without disclosing vulnerability details.
 
-Keep system Qt and image codecs patched. Native plugins are disabled by default and run with full user
+Keep system Qt and image codecs patched when using the Debian package. For the AppImage, install a
+rebuilt release to update its bundled Qt and codecs. Native plugins are disabled by default and run with full user
 permissions if explicitly enabled. This program does not provide a sandbox for untrusted plugins or codecs.
 The review does not establish that upstream authors intended malicious behavior.
